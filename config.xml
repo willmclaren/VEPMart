@@ -68,7 +68,7 @@
             <sub name="Other">
                 <field name="MOTIF_NAME" label="Transcription factor binding motif ID" header="Motif"/>
                 <field name="MOTIF_POS" label="Motif position" header="MPos"/>
-                <field name="MOTIF_SCORE_CHANGE" label="Motif binding score change" header="MChange"/>
+                <field name="MOTIF_SCORE_CHANGE" label="Motif binding score change" header="MChange" range="-1,1"/>
                 <field name="HIGH_INF_POS" label="High information position?" header="MInfo"/>
             </sub>
         </group>
