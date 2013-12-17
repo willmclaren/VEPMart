@@ -1,46 +1,50 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="eng"><!-- InstanceBegin template="/Templates/new_template_leftmenu.dwt" codeOutsideHTMLIsLocked="false" -->
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="eng">
 <head>
 <title>VEP mart</title>
-<script type="text/javascript" src="http://code.jquery.com/jquery-1.10.2.min.js"></script>
-<script type="text/javascript" src="http://code.jquery.com/ui/1.10.3/jquery-ui.js"></script>
-<script type="text/javascript" src="https://datatables.net/download/build/jquery.dataTables.min.js"></script>
-<script type="text/javascript" src="vep_mart.js"></script>
-<link rel="stylesheet" href="http://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css"/>
-<link rel="stylesheet" href="https://datatables.net/release-datatables/media/css/demo_table.css"/>
-<link rel="stylesheet" href="style.css"/>
+<script type="text/javascript" src="js/jquery-1.10.2.min.js"></script>
+<script type="text/javascript" src="js/jquery-ui-1.10.3.custom.min.js"></script>
+<script type="text/javascript" src="js/jquery.dataTables.min.js"></script>
+<script type="text/javascript" src="js/vep_mart.js"></script>
+<script type="text/javascript" src="js/ColReorder.min.js"></script>
+<link rel="stylesheet" href="css/jquery-ui-1.10.3.custom.min.css"/>
+<link rel="stylesheet" href="css/ColReorder.css"/>
+<link rel="stylesheet" href="css/style.css"/>
 </head>
 
 <body>
-    <div class="header">
-        <div class="controls">
-            <a href="#" class="button search-button">Search</a>
-            <a href="#" class="button reset-button">Reset</a>
-        </div>
-        <div class="url-container">
-            <input style="float:right;" type="text" class="url-value"/>
-        </div>
-        <div class="title">
-            <nobr><h1><img src="http://www.ensembl.org/i/vep_logo_sm.png" style="vertical-align: middle"> MART</h1></nobr>
-        </div>
+  <div class="header">
+    <div class="controls">
+      <a href="#" class="button search-button">Search</a>
+      <a href="#" class="button reset-button">Reset</a>
     </div>
-    
-    <div class="main">
-        <div class="search-container">
-            <div class="search">
-                <img src="ajax-loader.gif"/>
-                Loading fields
-            </div>
-            <div>
-                <a href="#" class="button hide-button">&lt; Hide</a>
-            </div>
-        </div>
-    
-        <div class="results-container">
-            <div class="results">
-            </div>
-        </div>
+    <div class="url-container">
+      <input style="float:right;" type="text" class="url-value" id="url-value"/>
     </div>
+    <div class="title">
+      <nobr><h1><img src="img/vep_logo_sm.png" style="vertical-align: middle"> MART</h1></nobr>
+    </div>
+  </div>
+  
+  <div class="main">
+    <div class="search-container">
+      <div class="search">
+        <img src="ajax-loader.gif"/>
+        Loading fields
+      </div>
+      <div>
+        <a href="#" class="button hide-button">&lt; Hide</a>
+      </div>
+    </div>
+  
+    <div class="results-container">
+      <div class="results"></div>
+    </div>
+  </div>
+  
+  <div class="footer">
+    <div class="footer-stats"></div>
+  </div>
 </body>
 
 </html>
