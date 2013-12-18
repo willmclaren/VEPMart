@@ -973,7 +973,10 @@ function renderResults(text) {
     collapsible: true,
     heightStyle: "content",
     beforeActivate: function(event, ui) {
-      $('#formatted-table').dataTable().fnAdjustColumnSizing();
+      var table = $.fn.dataTable.fnTables();
+      if ( table.length > 0 ) {
+        $(table).dataTable().fnAdjustColumnSizing();
+      }
     }
   });
 }
@@ -1003,14 +1006,18 @@ function renderTable() {
     bFilter: false,
     sPaginationType: "full_numbers",
     bStateSave: true,
-    //sScrollY: "300px",
-    //"bDeferRender": true,
+    bScrollInfinite: true,
+    bScrollCollapse: true,
+    sScrollY: "210px",
+    oLanguage: {
+      sProcessing: '<img height="12px" src="img/ajax-loader.gif"/> Loading data'
+    },
     
     // use jquery ThemeRoller style
     bJQueryUI: true,
     
     // enable column reordering, set up DOM
-    sDom: 'R<"table-controls"<"right"p><"right pad"i>l>tr',
+    sDom: 'R<"table-controls"<"right"r>i>t',
     
     // ajax data
     "bProcessing": true,
