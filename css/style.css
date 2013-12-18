@@ -153,6 +153,27 @@ tr:nth-child(even) {background-color: #f0f0f0;}
   border-radius: 4px;
   text-align: right;
 }
+.left {
+  float: left;
+}
+.right {
+  float: right;
+}
+.pad {
+  padding-left: 1em;
+  padding-right: 1em;
+}
+.fg-button {
+  padding-left: 0.5em;
+  padding-right: 0.5em;
+}
+.table-controls {
+  background: lightgrey;
+  padding: 0.5em;
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  font-size: 12px;
+}
 /*.AND {
   background: green;
 }
