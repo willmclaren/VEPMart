@@ -963,7 +963,7 @@ function renderResults(text) {
   
   // start table
   if(numFound) {
-    renderTable(json);
+    renderTable();
   }
   else {
     $('.formatted').append('No data');
@@ -971,11 +971,14 @@ function renderResults(text) {
   
   $('#results-accordion').accordion({
     collapsible: true,
-    heightStyle: "content"
+    heightStyle: "content",
+    beforeActivate: function(event, ui) {
+      $('#formatted-table').dataTable().fnAdjustColumnSizing();
+    }
   });
 }
 
-function renderTable(json) {  
+function renderTable() {  
   $('.formatted').append('<table id="formatted-table">');
   
   // add headers    
@@ -997,11 +1000,74 @@ function renderTable(json) {
     
     // basic options
     sScrollX: "100%",
-    bPaginate: false,
     bFilter: false,
+    sPaginationType: "full_numbers",
+    bStateSave: true,
+    //sScrollY: "300px",
+    //"bDeferRender": true,
     
-    // enable column reordering
-    sDom: 'Rlfrtip',
+    // use jquery ThemeRoller style
+    bJQueryUI: true,
+    
+    // enable column reordering, set up DOM
+    sDom: 'R<"table-controls"<"right"p><"right pad"i>l>tr',
+    
+    // ajax data
+    "bProcessing": true,
+    "bServerSide": true,
+    "sAjaxSource": $('#url-value').prop('value'),
+    "fnServerData": function ( sSource, aoData, fnCallback ) {
+      var start;
+      var length;
+      
+      // get start and length
+      for(var i=0; i<aoData.length; i++) {
+        if(aoData[i].name === "iDisplayStart") {
+          start = aoData[i].value;
+        }
+        
+        if(aoData[i].name === "iDisplayLength") {
+          length = aoData[i].value;
+        }
+      }
+      
+      if(length < 0) length = 10;
+      
+      var newaoData = ({
+        wt: 'json',
+        rows: length,
+        start: start
+      });
+      
+      $.getJSON( sSource, newaoData, function (json) {
+        
+        var rows = [];
+        var order = globalStore.order;
+        
+        for(var i=0; i<json.response.docs.length; i++) {
+          
+          // reset row string
+          var row = [];
+          
+          for(var j=0; j<order.length; j++) {
+            var field = order[j];
+            row.push(json.response.docs[i][field] ? unescape(json.response.docs[i][field]) : '-');
+          }
+          
+          rows.push(row);
+        }
+        
+        var numFound = json.response.numFound;
+        
+        var output = {
+          "iTotalDisplayRecords": numFound,
+          "iTotalRecords": numFound,
+          "aaData": rows
+        };
+        
+        fnCallback(output);
+      });
+    },
     
     // when the columns are reordered we have to update the order in our vars
     oColReorder: {
@@ -1011,8 +1077,9 @@ function renderTable(json) {
         var pos = 1;
         var order = [];
         var added = {};
+        var table = $('#formatted-table');
         
-        $('#formatted-table').find('th').each(function() {
+        table.find('th').each(function() {
           // find the field from the rel
           var k = $(this).attr('rel');
           var field = fieldInfo[k];
@@ -1034,12 +1101,10 @@ function renderTable(json) {
         // update globalStore order
         globalStore.order = order;
         updateCookies();
+        
+        table.adjustColumnSizing();
       }
-    },
-    //bStateSave: true,
-    
-    // use jquery ThemeRoller style
-    bJQueryUI: true
+    }
   });
   
   // set column vis
@@ -1047,125 +1112,7 @@ function renderTable(json) {
     table.fnSetColumnVis(i, fieldInfo[order[i]].hidden ? false : true);
   }
   
-  var rows = [];
-  
-  // add data
-  for(var i=0; i<json.response.docs.length; i++) {
-    
-    // reset row string
-    var row = [];
-    
-    for(var j=0; j<order.length; j++) {
-      var field = order[j];
-      row.push(json.response.docs[i][field] ? unescape(json.response.docs[i][field]) : '-');
-    }
-    
-    rows.push(row);
-  }
-  table.fnAddData(rows);
-  
-  $('.dataTables_info').addClass('hidden');
-  
-  renderTableButtons(json);
-}
-
-function renderTableButtons(json) {
-  var numFound = json.response.numFound;
-  
-  // table navigation
-  $('.formatted').prepend(
-    '<div class="table-controls">Showing results <span id="show-from">0</span> to <span id="show-to">0</span> of <span id="show-of">0</span>' +
-    '<span style="float:right">' +
-      '<a href="#" class="table-first noclick">First</a> | ' +
-      '<a href="#" class="table-prev noclick">Prev</a> | ' +
-      '<a href="#" class="table-next">Next</a> | ' + 
-      '<a href="#" class="table-last">Last</a>' + 
-    '</span>' +
-    '<span id="table-rows-container" style="float:right; margin-right: 10px;">' +
-      'Show <select id="table-rows">' +
-        '<option value="10" selected="selected">10</option>' +
-        '<option value="25">25</option>' +
-        '<option value="50">50</option>' +
-        '<option value="' + numFound + '">All</option>' +
-      '</select> results | ' +
-    '</span>' +
-    '<span id="table-loader" style="float:right; margin-right: 10px;"></span>'
-  );
-  
-  $('#table-rows').on('change', function() {
-    globalStore.tableRows = parseInt($(this).val());
-    paginateTable(globalStore.tableStart, globalStore.tableRows);
-    updateShow();
-  });
-  
-  globalStore.tableStart = 0;
-  globalStore.tableRows = 10;
-  globalStore.numFound = numFound;
-  
-  if(numFound) {
-    $('.table-next').removeClass('noclick');
-    $('.table-last').removeClass('noclick');
-    $('#table-rows').prop('disabled', false);
-  }
-  else {
-    $('.table-next').addClass('noclick');
-    $('.table-last').addClass('noclick');
-    $('#table-rows').prop('disabled', 'disabled');
-    globalStore.tableRows = 0;
-  }
-  
-  updateShow();
-  
-  // first
-  $('.table-first').on('click', function() {
-    globalStore.tableStart = 0;
-    $(this).addClass('noclick');
-    $('.table-prev').addClass('noclick');
-    $('.table-next').removeClass('noclick');
-    $('.table-last').removeClass('noclick');
-    
-    paginateTable(globalStore.tableStart, globalStore.tableRows);
-    updateShow();
-  });
-  
-  // prev
-  $('.table-prev').on('click', function() {
-    globalStore.tableStart = globalStore.tableStart - globalStore.tableRows;
-    if(globalStore.tableStart <= 0) {
-      globalStore.tableStart = 0;
-      $(this).addClass('noclick');
-    }
-    $('.table-next').removeClass('noclick');
-    $('.table-last').removeClass('noclick');
-    paginateTable(globalStore.tableStart, globalStore.tableRows);
-    
-    updateShow();
-  });
-  
-  // next
-  $('.table-next').on('click', function() {
-    globalStore.tableStart = globalStore.tableStart + globalStore.tableRows;
-    paginateTable(globalStore.tableStart, globalStore.tableRows);
-    updateShow();
-    $('.table-prev').removeClass('noclick');
-    $('.table-first').removeClass('noclick');
-  });
-  
-  // last
-  $('.table-last').on('click', function() {
-    globalStore.tableStart = Math.floor(globalStore.numFound / globalStore.tableRows) * globalStore.tableRows;
-    paginateTable(globalStore.tableStart, globalStore.tableRows);
-    updateShow();
-    $('.table-next').addClass('noclick');
-    $(this).addClass('noclick');
-    $('.table-prev').removeClass('noclick');
-    $('.table-first').removeClass('noclick');
-  });
-  
-  // hack for table not rendering properly when initially hidden in accordion
-  $('#formatted-label').on('click', function() {
-    paginateTable(globalStore.tableStart, globalStore.tableRows);
-  });
+  table.fnAdjustColumnSizing();
   
   // configure columns popup
   $('.formatted').append('<div style="margin-top: 1em;"><a style="float:right" href="#" class="button config-button">Configure columns</a></div>');
