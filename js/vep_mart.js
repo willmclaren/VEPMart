@@ -781,147 +781,6 @@ function parseEditedQueryString(noRedraw) {
   renderAllLogicGroups(noRedraw);
 }
 
-function renderAllLogicGroups(noRedraw) {
-  
-  if(!noRedraw) var logic = $('.logic-groups-container').empty();
-  
-  // set firstGroup to undefined
-  globalStore.firstGroup = undefined;
-  
-  var totalFieldsAdded = 0;
-  
-  for(var i=0; i<logicGroups.length; i++) {
-    var group = logicGroups[i];
-    if(!group.fields.length) continue;
-    
-    var listItems = '';
-    var fieldsAdded = 0;
-    
-    for(var j=0; j<group.fields.length; j++) {
-      var key = group.fields[j];
-      
-      // check if it's checked
-      if($('[name=check_' + key + ']').prop('checked') && queryParams[key] && queryParams[key].length) {
-        if(!noRedraw) 
-          listItems = listItems + '<li id="draggable-' + key + '" title="' + fieldInfo[key].label + '"> ' +
-            '<img src="img/move_icon.jpg" style="height:12px;" /> ' +
-            '<b>' + key + '</b>:' + queryParams[key] +
-          '</li>';
-        
-        fieldsAdded++;
-      }
-    }
-    
-    if(fieldsAdded) {
-      if(typeof(globalStore.firstGroup) === 'undefined') globalStore.firstGroup = group.id;
-      
-      if(!noRedraw) renderLogicGroup(group);
-      
-      var list = $('#logic-group-list' + group.id);
-      list.append(listItems);
-      if(!noRedraw) list.sortable().disableSelection();
-      if(fieldsAdded > 1) $('#logic-group' + group.id).find('.inner-logic').removeClass('hidden');
-    }
-    
-    totalFieldsAdded = totalFieldsAdded + fieldsAdded;
-  }
-  
-  // show button to add logic group if we have more than 1 field
-  if(totalFieldsAdded > 1) $('.add-logic-group').removeClass('hidden');
-  
-  // connect lists    
-  if(!noRedraw) $('.logic-group-list').sortable( "option", "connectWith", ".logic-group-list");
-}
-
-// renders a logic group
-function renderLogicGroup(group) {
-  var container = $('.logic-groups-container');
-  
-  // render connector
-  if(globalStore.firstGroup != group.id) {
-    container.
-      append('<div class="logic-connector">').
-      append('<span class="outer-logic">' + 
-        '<input type="radio" value="AND" name="outer_' + group.id + '" id="outer1_' + group.id + '" ' + (group.outerLogic === 'AND' ? 'checked="checked"' : '') +' /><label for="outer1_' + group.id + '">AND</label>' +
-        '<input type="radio" value="OR" name="outer_' + group.id + '" id="outer2_' + group.id + '" ' + (group.outerLogic === 'OR' ? 'checked="checked"' : '') +' /><label for="outer2_' + group.id + '">OR</label>' +
-        '<input type="radio" value="NOT" name="outer_' + group.id + '" id="outer3_' + group.id + '" ' + (group.outerLogic === 'NOT' ? 'checked="checked"' : '') +' /><label for="outer3_' + group.id + '">NOT</label>'
-      ).append('<div class="logic-connector">');
-    
-    // outer-logic handler
-    $('[name="outer_' + group.id + '"]').on('change', function() {
-      var id = this.name.replace('outer_', '');
-      logicGroups[id].outerLogic = this.value;
-      updateQueryString(true);
-      
-      //doSearch();
-    })
-  }
-  
-  // render group
-  container.append(
-    '<div class="logic-group ' + group.innerLogic + '" id="logic-group' + group.id + '">' +
-    '<div>' +
-      '<span class="logic-group-header">Group ' + (group.id + 1) + '</span>' +
-      '<span class="inner-logic hidden">' +
-        '<input type="radio" value="AND" name="inner_' + group.id + '" id="inner1_' + group.id + '" ' + (group.innerLogic === 'AND' ? 'checked="checked"' : '') +' /><label for="inner1_' + group.id + '">AND</label>' +
-        '<input type="radio" value="OR" name="inner_' + group.id + '" id="inner2_' + group.id + '" ' + (group.innerLogic === 'OR' ? 'checked="checked"' : '') +' /><label for="inner2_' + group.id + '">OR</label>' +
-        '<input type="radio" value="NOT" name="inner_' + group.id + '" id="inner3_' + group.id + '" ' + (group.innerLogic === 'NOT' ? 'checked="checked"' : '') +' /><label for="inner3_' + group.id + '">NOT</label>' +
-      '</span>' +
-    '</div>' +
-    '<ul class="logic-group-list" id="logic-group-list' + group.id + '">'
-  );
-  
-  // inner-logic handler
-  $('[name="inner_' + group.id + '"]').on('change', function() {
-    var id = this.name.replace('inner_', '');
-    $('#logic-group' + id).removeClass(logicGroups[id].innerLogic);
-    
-    logicGroups[id].innerLogic = this.value;
-    $('#logic-group' + id).addClass(this.value);
-    
-    updateQueryString(true);
-    
-    //doSearch();
-  })
-  
-  // make sortable list
-  $('#logic-group-list' + group.id).sortable({
-    
-    // receive handler for when a field is dropped on a group
-    receive: function(event, ui) {
-      var item = ui.item;
-      var sender = ui.sender;
-      
-      // get IDs and keys
-      var key = item.prop("id").replace('draggable-', '');
-      var oldGroupId = sender.prop("id").replace('logic-group-list', '');
-      var newGroupId = this.id.replace('logic-group-list', '');
-      
-      // remove from old group
-      var tmp = [];
-      for(var i=0; i<logicGroups[oldGroupId].fields.length; i++) {
-        if(key != logicGroups[oldGroupId].fields[i]) tmp.push(logicGroups[oldGroupId].fields[i]);
-      }
-      logicGroups[oldGroupId].fields = tmp;
-      
-      // add to new group
-      logicGroups[newGroupId].fields.push(key);
-      fieldInfo[key].logicGroup = newGroupId;
-      
-      updateQueryString();
-      
-      //doSearch();
-    }
-  }).disableSelection();
-  
-  // enable buttons
-  $('.outer-logic').buttonset();
-  $('.inner-logic').buttonset();
-  
-  // connect lists
-  $('.logic-group-list').sortable( "option", "connectWith", ".logic-group-list");
-}
-
 // renders results panel
 function renderResults(text) {
   $('.results').empty();
@@ -1004,6 +863,7 @@ function renderTable() {
     // basic options
     sScrollX: "100%",
     bFilter: false,
+    bSort: false,
     sPaginationType: "full_numbers",
     bStateSave: true,
     bScrollInfinite: true,
@@ -1234,6 +1094,147 @@ function configureColumns() {
   });
 }
 
+function renderAllLogicGroups(noRedraw) {
+  
+  if(!noRedraw) var logic = $('.logic-groups-container').empty();
+  
+  // set firstGroup to undefined
+  globalStore.firstGroup = undefined;
+  
+  var totalFieldsAdded = 0;
+  
+  for(var i=0; i<logicGroups.length; i++) {
+    var group = logicGroups[i];
+    if(!group.fields.length) continue;
+    
+    var listItems = '';
+    var fieldsAdded = 0;
+    
+    for(var j=0; j<group.fields.length; j++) {
+      var key = group.fields[j];
+      
+      // check if it's checked
+      if($('[name=check_' + key + ']').prop('checked') && queryParams[key] && queryParams[key].length) {
+        if(!noRedraw) 
+          listItems = listItems + '<li id="draggable-' + key + '" title="' + fieldInfo[key].label + '"> ' +
+            '<img src="img/move_icon.jpg" style="height:12px;" /> ' +
+            '<b>' + key + '</b>:' + queryParams[key] +
+          '</li>';
+        
+        fieldsAdded++;
+      }
+    }
+    
+    if(fieldsAdded) {
+      if(typeof(globalStore.firstGroup) === 'undefined') globalStore.firstGroup = group.id;
+      
+      if(!noRedraw) renderLogicGroup(group);
+      
+      var list = $('#logic-group-list' + group.id);
+      list.append(listItems);
+      if(!noRedraw) list.sortable().disableSelection();
+      if(fieldsAdded > 1) $('#logic-group' + group.id).find('.inner-logic').removeClass('hidden');
+    }
+    
+    totalFieldsAdded = totalFieldsAdded + fieldsAdded;
+  }
+  
+  // show button to add logic group if we have more than 1 field
+  if(totalFieldsAdded > 1) $('.add-logic-group').removeClass('hidden');
+  
+  // connect lists    
+  if(!noRedraw) $('.logic-group-list').sortable( "option", "connectWith", ".logic-group-list");
+}
+
+// renders a logic group
+function renderLogicGroup(group) {
+  var container = $('.logic-groups-container');
+  
+  // render connector
+  if(globalStore.firstGroup != group.id) {
+    container.
+      append('<div class="logic-connector">').
+      append('<span class="outer-logic">' + 
+        '<input type="radio" value="AND" name="outer_' + group.id + '" id="outer1_' + group.id + '" ' + (group.outerLogic === 'AND' ? 'checked="checked"' : '') +' /><label for="outer1_' + group.id + '">AND</label>' +
+        '<input type="radio" value="OR" name="outer_' + group.id + '" id="outer2_' + group.id + '" ' + (group.outerLogic === 'OR' ? 'checked="checked"' : '') +' /><label for="outer2_' + group.id + '">OR</label>' +
+        '<input type="radio" value="NOT" name="outer_' + group.id + '" id="outer3_' + group.id + '" ' + (group.outerLogic === 'NOT' ? 'checked="checked"' : '') +' /><label for="outer3_' + group.id + '">NOT</label>'
+      ).append('<div class="logic-connector">');
+    
+    // outer-logic handler
+    $('[name="outer_' + group.id + '"]').on('change', function() {
+      var id = this.name.replace('outer_', '');
+      logicGroups[id].outerLogic = this.value;
+      updateQueryString(true);
+      
+      //doSearch();
+    })
+  }
+  
+  // render group
+  container.append(
+    '<div class="logic-group ' + group.innerLogic + '" id="logic-group' + group.id + '">' +
+    '<div>' +
+      '<span class="logic-group-header">Group ' + (group.id + 1) + '</span>' +
+      '<span class="inner-logic hidden">' +
+        '<input type="radio" value="AND" name="inner_' + group.id + '" id="inner1_' + group.id + '" ' + (group.innerLogic === 'AND' ? 'checked="checked"' : '') +' /><label for="inner1_' + group.id + '">AND</label>' +
+        '<input type="radio" value="OR" name="inner_' + group.id + '" id="inner2_' + group.id + '" ' + (group.innerLogic === 'OR' ? 'checked="checked"' : '') +' /><label for="inner2_' + group.id + '">OR</label>' +
+        '<input type="radio" value="NOT" name="inner_' + group.id + '" id="inner3_' + group.id + '" ' + (group.innerLogic === 'NOT' ? 'checked="checked"' : '') +' /><label for="inner3_' + group.id + '">NOT</label>' +
+      '</span>' +
+    '</div>' +
+    '<ul class="logic-group-list" id="logic-group-list' + group.id + '">'
+  );
+  
+  // inner-logic handler
+  $('[name="inner_' + group.id + '"]').on('change', function() {
+    var id = this.name.replace('inner_', '');
+    $('#logic-group' + id).removeClass(logicGroups[id].innerLogic);
+    
+    logicGroups[id].innerLogic = this.value;
+    $('#logic-group' + id).addClass(this.value);
+    
+    updateQueryString(true);
+    
+    //doSearch();
+  })
+  
+  // make sortable list
+  $('#logic-group-list' + group.id).sortable({
+    
+    // receive handler for when a field is dropped on a group
+    receive: function(event, ui) {
+      var item = ui.item;
+      var sender = ui.sender;
+      
+      // get IDs and keys
+      var key = item.prop("id").replace('draggable-', '');
+      var oldGroupId = sender.prop("id").replace('logic-group-list', '');
+      var newGroupId = this.id.replace('logic-group-list', '');
+      
+      // remove from old group
+      var tmp = [];
+      for(var i=0; i<logicGroups[oldGroupId].fields.length; i++) {
+        if(key != logicGroups[oldGroupId].fields[i]) tmp.push(logicGroups[oldGroupId].fields[i]);
+      }
+      logicGroups[oldGroupId].fields = tmp;
+      
+      // add to new group
+      logicGroups[newGroupId].fields.push(key);
+      fieldInfo[key].logicGroup = newGroupId;
+      
+      updateQueryString();
+      
+      //doSearch();
+    }
+  }).disableSelection();
+  
+  // enable buttons
+  $('.outer-logic').buttonset();
+  $('.inner-logic').buttonset();
+  
+  // connect lists
+  $('.logic-group-list').sortable( "option", "connectWith", ".logic-group-list");
+}
+
 function updateDownloadURL(event) {
   var type = event.data.type;
   
@@ -1244,72 +1245,6 @@ function updateDownloadURL(event) {
   }
   
   $('.download-' + type).attr('href', $('#url-value').prop("value") + '&wt=' + type + '&rows=999999999&fl=' + fields.toString());
-}
-
-function updateShow() {
-  var to = globalStore.tableStart + globalStore.tableRows;
-  if(to > globalStore.numFound) to = globalStore.numFound;
-  
-  $('#show-from').text(globalStore.tableStart + 1);
-  $('#show-to').empty().text(String(to).replace(/^0/, ''));
-  $('#show-of').text(globalStore.numFound);
-}
-
-function paginateTable(start, rows) {
-  var url = $('#url-value').prop('value');
-  var table = $('#formatted-table').dataTable();
-  
-  table.fnClearTable();
-  $('#table-loader').empty().append('<img src="img/ajax-loader.gif"/>');
-  
-  $.ajax({
-    url: url,
-    type: 'GET',
-    dataType: 'json',
-    
-    data: {
-      wt: 'json',
-      indent: true,
-      start: start,
-      rows: rows
-    },
-    
-    success: function( json ) {
-      var table = $('#formatted-table').dataTable();
-      
-      table.fnClearTable();
-      
-      var numFound = json.response.numFound;
-      
-      if(numFound) {
-        var order = globalStore.order;
-        var rows = [];
-        
-        // add data
-        for(var i=0; i<json.response.docs.length; i++) {
-          
-          // reset row string
-          var row = [];
-          
-          for(var j=0; j<order.length; j++) {
-            var field = order[j];
-            row.push(json.response.docs[i][field] ? unescape(json.response.docs[i][field]) : '-');
-          }
-          
-          rows.push(row);
-        }
-        
-        table.fnAddData(rows);
-        table.fnDraw();  
-        table.fnAdjustColumnSizing();
-        $('#table-loader').empty();
-      }
-    },
-    
-    error: function(xhr, status) {
-      $('.results').empty().append('Search failed: ' + xhr.statusText);
-    }
-  });
 }
 
 // this function updates cookies that store field order and hidden state
