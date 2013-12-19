@@ -1024,6 +1024,10 @@ function renderTable() {
     "bServerSide": true,
     "sAjaxSource": $('#url-value').prop('value'),
     "fnServerData": function ( sSource, aoData, fnCallback ) {
+      
+      // we need to convert the parameters DataTables sends into
+      // the parameters that Solr expects. We just need the start
+      // row and the number of rows required
       var start;
       var length;
       
@@ -1040,6 +1044,7 @@ function renderTable() {
       
       if(length < 0) length = 10;
       
+      // create object to pass to $.getJSON
       var newaoData = ({
         wt: 'json',
         rows: length,
@@ -1048,7 +1053,11 @@ function renderTable() {
       
       $.getJSON( sSource, newaoData, function (json) {
         
+        // now we need to convert what Solr sends back into the form
+        // that DataTables expects, which is an object with a property
+        // "aaData" containing the actual returned rows
         var rows = [];
+        getColumnOrder();
         var order = globalStore.order;
         
         for(var i=0; i<json.response.docs.length; i++) {
@@ -1072,6 +1081,7 @@ function renderTable() {
           "aaData": rows
         };
         
+        // send data back to DataTables
         fnCallback(output);
       });
     },
@@ -1079,37 +1089,12 @@ function renderTable() {
     // when the columns are reordered we have to update the order in our vars
     oColReorder: {
       "fnReorderCallback": function () {
+        getColumnOrder();
         
-        // get order from th cells
-        var pos = 1;
-        var order = [];
-        var added = {};
-        var table = $('#formatted-table');
-        
-        table.find('th').each(function() {
-          // find the field from the rel
-          var k = $(this).attr('rel');
-          var field = fieldInfo[k];
-          
-          // update field's order from current pos
-          field.order = pos;
-          order.push(k);
-          added[k] = true;
-          pos++;
-        });
-        
-        // don't want to lose hidden fields, add them to the end
-        // can we do this better so the order is retained somehow????
-        for(var i=0; i<globalStore.order.length; i++) {
-          var field = globalStore.order[i];
-          if(!added.hasOwnProperty(field)) { order.push(field); }
+        var table = $.fn.dataTable.fnTables();
+        if ( table.length > 0 ) {
+          $(table).dataTable().fnAdjustColumnSizing();
         }
-        
-        // update globalStore order
-        globalStore.order = order;
-        updateCookies();
-        
-        table.adjustColumnSizing();
       }
     }
   });
@@ -1127,6 +1112,36 @@ function renderTable() {
     event.preventDefault;
     configureColumns();
   });
+}
+
+function getColumnOrder() {
+  var table = $('#formatted-table');
+  var pos = 1;
+  var order = [];
+  var added = {};
+  
+  table.find('th').each(function() {
+    // find the field from the rel
+    var k = $(this).attr('rel');
+    var field = fieldInfo[k];
+    
+    // update field's order from current pos
+    field.order = pos;
+    order.push(k);
+    added[k] = true;
+    pos++;
+  });
+  
+  // don't want to lose hidden fields, add them to the end
+  // can we do this better so the order is retained somehow????
+  for(var i=0; i<globalStore.order.length; i++) {
+    var field = globalStore.order[i];
+    if(!added.hasOwnProperty(field)) { order.push(field); }
+  }
+  
+  // update globalStore order
+  globalStore.order = order;
+  updateCookies();
 }
 
 function configureColumns() {
