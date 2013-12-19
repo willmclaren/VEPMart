@@ -70,19 +70,9 @@ tr:nth-child(even) {background-color: #f0f0f0;}
   text-decoration: none;
   cursor: default;
 }
-.dataTable th {
-  /*height: 100px;*/
-  /*writing-mode:tb-rl;*/
-  /*-webkit-transform:rotate(90deg);*/
-  /*-moz-transform:rotate(90deg);*/
-  /*-o-transform: rotate(90deg);*/
-}
 .dataTable td {
   padding-right: 2px;
   padding-left: 2px;
-}
-.table-controls {
-  font-size: 15px;
 }
 .logic-group {
   border: 1px solid #333366;
@@ -158,25 +148,8 @@ tr:nth-child(even) {background-color: #f0f0f0;}
 }
 .right {
   float: right;
-}
-.pad {
   padding-left: 1em;
-  padding-right: 1em;
-}
-.fg-button {
-  padding-left: 0.5em;
-  padding-right: 0.5em;
 }
 .table-controls {
-  background: lightgrey;
   padding: 0.5em;
-  border-top-left-radius: 4px;
-  border-top-right-radius: 4px;
-  font-size: 12px;
 }
-/*.AND {
-  background: green;
-}
-.OR {
-  background: blue;
-}*/
