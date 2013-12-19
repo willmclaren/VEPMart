@@ -788,17 +788,17 @@ function renderResults(text) {
   // create tabs
   $('.results').append('<div id="results-accordion">');
   
-  $('#results-accordion').append('<h3>Count</h3><div class="count">');
-  $('#results-accordion').append('<h3 id="formatted-label">Table</h3><div class="formatted" style="font-size:12px">');
-  $('#results-accordion').append('<h3>Raw</h3><div class="raw" style="max-height:300px; scroll: auto">');
+  $('#results-accordion').append('<h3 id="formatted-label">Results preview</h3><div class="formatted" style="font-size:12px">');
   $('#results-accordion').append('<h3>Download</h3><div class="download">');
   
+  // parse JSON
   var json = JSON.parse(text);
-  var numFound = json.response.numFound;
-  $('.count').append('Found ' + numFound + ' results<div style="font-size:small; color: grey; float:right;clear: both">Query time: ' + (json.responseHeader.QTime / 1000) + 's');
-  $('.raw').append('<pre class="syntax language-json" style="margin:0"><code style="font-size: 10px;">' + text + '</code></pre>');
+  
+  // add query time
+  $('.formatted').append('<div style="font-size:small; color: grey; float:right; clear: both; padding-bottom:1em;">Query time: ' + (json.responseHeader.QTime / 1000) + 's');
  
   // download section
+  var numFound = json.response.numFound;
   $('.download').append('Download ' + numFound + ' results as: ');
   
   var types = ['XML', 'JSON', 'CSV'];
@@ -877,7 +877,7 @@ function renderTable() {
     bJQueryUI: true,
     
     // enable column reordering, set up DOM
-    sDom: 'R<"table-controls"<"right"r>i>t',
+    sDom: 'Rt<"table-controls"<"right config-button-div"><"right"r>i>',
     
     // ajax data
     "bProcessing": true,
@@ -967,8 +967,8 @@ function renderTable() {
   table.fnAdjustColumnSizing();
   
   // configure columns popup
-  $('.formatted').append('<div style="margin-top: 1em;"><a style="float:right" href="#" class="button config-button">Configure columns</a></div>');
-  $('.config-button').button().on('click', function(event) {
+  $('.config-button-div').append('<div><a style="float:right" class="button" id="config-button">Configure columns</a></div>');
+  $('#config-button').button().on('click', function(event) {
     event.preventDefault;
     configureColumns();
   });
