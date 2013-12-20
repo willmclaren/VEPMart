@@ -1,35 +1,47 @@
 body {
   font-family: sans-serif;
+  padding-left: 1em;
+  padding-right: 1em;
 }
 tr:nth-child(even) {background-color: #f0f0f0;}
 
-.field-container {
-  width: 450px;
-  clear: both;
-  padding-bottom: 2px;
-}
-.field-label {
-  font-size: 12px;
-}
-.field {
-  float: right;
-  font-size: 12px;
-  height: 16px;
-}
 .ui-widget input {
   font-size: 12px;
 }
 .search-container {
-  width: 500px;
-  float: left;
+  padding-bottom: 1em;
 }
 .search {
-  margin-bottom: 10px;
+  padding: 1em;
+  background-color: lightgrey;
+  border-radius: 4px;
+}
+.search input {
+  font-size: 15px;
+  width: 25%;
+}
+.search label {
+  font-size: 18px;
+  font-weight: bold;
+}
+.field-value {
+  padding-left: 1em;
+  padding-right: 1em;
+  width: 80%;
+}
+.filters-container {
+  float: left;
+  width: 300px;
 }
 .results-container {
-  margin-left: 510px;
-  border-left: 1px dotted grey;
+  margin-left: 310px;
+  /*border-left: 1px dotted grey;*/
   padding-left: 10px;
+}
+.loading {
+  background: white;
+  padding: 0.5em;
+  border-radius: 4px;
 }
 .url-value {
   width: 70%;
@@ -40,6 +52,8 @@ tr:nth-child(even) {background-color: #f0f0f0;}
 .controls {
   float: right;
   vertical-align: top;
+  padding: 1em;
+  border-left: 1px dashed white;
 }
 .sub-container {
   padding-bottom: 5px;
@@ -60,7 +74,9 @@ tr:nth-child(even) {background-color: #f0f0f0;}
 .url-container {
   float:right;
   width: 80%;
-  margin-right: 20px;
+}
+.url-label {
+  color: grey;
 }
 .title {
   width: 200px;
@@ -104,8 +120,8 @@ tr:nth-child(even) {background-color: #f0f0f0;}
   margin-left: auto;
   margin-right: auto;
   width: 1px;
-  height: 20px;
-  border-right: 1px dashed grey;
+  height: 10px;
+  border-right: 1px solid grey;
 }
 .outer-logic {
   margin-left: auto;
@@ -152,4 +168,22 @@ tr:nth-child(even) {background-color: #f0f0f0;}
 }
 .table-controls {
   padding: 0.5em;
+}
+.ui-autocomplete {
+  max-height: 400px;
+  overflow-y: auto;
+  /* prevent horizontal scrollbar */
+  overflow-x: hidden;
+}
+.ui-accordion .ui-accordion-content {
+  padding: 1em;
+}
+.custom-combobox- {
+  padding-top: 8px;
+  margin-bottom: 3px;
+  vertical-align: middle;
+  margin-right: 5px;
+}
+.small-button {
+  font-size: 12px;
 }

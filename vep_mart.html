@@ -14,29 +14,33 @@
 
 <body>
   <div class="header">
-    <div class="controls">
-      <a href="#" class="button search-button">Search</a>
-      <a href="#" class="button reset-button">Reset</a>
-    </div>
     <div class="url-container">
-      <input style="float:right;" type="text" class="url-value" id="url-value"/>
+      <label class="url-label">Current query string:</label>
+      <input type="text" class="url-value" id="url-value"/>
     </div>
     <div class="title">
       <nobr><h1><img src="img/vep_logo_sm.png" style="vertical-align: middle"> MART</h1></nobr>
     </div>
   </div>
   
-  <div class="main">
-    <div class="search-container">
-      <div class="search">
-        <img src="ajax-loader.gif"/>
-        Loading fields
-      </div>
-      <div>
-        <a href="#" class="button hide-button">&lt; Hide</a>
-      </div>
+  <div class="search-container">
+    <div class="controls">
+      <a href="javascript:" class="button search-button">Search</a>
+      <a href="javascript:" class="button reset-button">Reset</a>
     </div>
+    <div class="search">
+      <img src="ajax-loader.gif"/>
+      Loading fields
+    </div>
+  </div>
   
+  <div class="main">
+    <div class="filters-container">
+      <!--<div>
+        <a href="#" class="button hide-button">&lt; Hide</a>
+      </div>-->
+    </div>
+    
     <div class="results-container">
       <div class="results"></div>
     </div>

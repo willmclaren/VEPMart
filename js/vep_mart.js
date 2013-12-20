@@ -3,11 +3,12 @@ var baseURL = '/solr/vep';
 var configURL = 'config.xml';
 
 // global variables
-var queryParams = {};   // URL params
+var filters = [];       // filters to apply
 var globalStore = {};   // general misc global store, could maybe use window instead?
 var logicGroups = [];   // logic groups for logic editor
 var fieldInfo = {};     // field information
 var groups = [];        // field groupings
+var lastFieldID = 0;
 
 $(document).ready(function() {
   
@@ -156,40 +157,6 @@ function getFields() {
     
     success: function( json ) {
       
-      // write footer
-      createFooter(json);
-      
-      $('.search').empty();
-      
-      $('.search').append('<div id="accordion">');
-      
-      for(var i=0; i<groups.length; i++) {
-        $('#accordion').append('<h3>' + groups[i].name + '</h3>' + '<div class="' + groups[i].name + '"></div>');
-        
-        for(var j=0; j<groups[i].subs.length; j++) {
-          $('.' + groups[i].name).append(
-            '<div class="sub-container ' + groups[i].name + '_' + groups[i].subs[j].replace(" ", "_") + '">' +
-            '<div class="sub-label">' + groups[i].subs[j] + '</div></div>'
-          );
-        }
-      }
-      
-      // add logic editor
-      $('#accordion').append('<h3 id="logic-header">Edit logic</h3>' + '<div class="logic-container"><div class="logic-groups-container">No fields selected yet</div></div>');
-     
-      $('.logic-container').append('<div class="add-logic-group hidden"><a href="#" class="button add-logic-button">Add group</a>');
-      $('.add-logic-button').button().on('click', function(event) {
-        var group = {
-          innerLogic: 'AND',
-          outerLogic: 'AND',
-          id: logicGroups.length,
-          fields: []
-        };
-        logicGroups.push(group);
-        
-        renderLogicGroup(group);
-      });
-      
       // add fields
       var fields = [];
       for(var k in json.fields) {
@@ -205,30 +172,117 @@ function getFields() {
         var field = json.fields[key];
         var type = field.type;
         if(!fieldInfo[key]) continue;
-        var group = fieldInfo[key].group + "_" + (fieldInfo[key].sub || 'Other').replace(" ", "_");
         
         // store type and whether it's a multi index
         fieldInfo[key].type = type;
         fieldInfo[key].multi = field.schema.match(/M/) ? true : false;
-        
-        $('.' + group).append(
-          '<div class="field-container" id="' + key + '-container"><label class="field-label">' +
-          '<input class="check" type="checkbox" name="check_' + key + '">' + (fieldInfo[key].label || key) + '</label>' +
-          '<input id="' + key + '" type="text" name="' + key + '" ' + (type === 'string' ? 'class="ac field"' : 'class="field"') + '/>'
-        );
-        
-        createSlider(type, key);
       }
       
-      // enable accordion
-      $(function() {
-        $( "#accordion" ).accordion({
-          collapsible: true,
-          heightStyle: "content"
-        });
+      // write footer
+      createFooter(json);
+      
+      $('.search')
+        .empty()
+        .append('<div id="add-filters-container">')
+        .append('<div id="current-slider" style="clear:both; display: none" title="Slide to set values">');
+      
+      $('#add-filters-container')
+        .append('<div id="add-filters" class="add-filters"><label>Add filters:</label></div> ');
+      
+      $('#add-filters')
+        .append('<span id="field-value" class="field-value">')
+        .append('<a href="javascript:" id="add-button" class="button">Add</a>')
+        .append('<a href="javascript:" id="edit-button" class="button">Update</a>');
+      
+      $('#field-value')
+        .append('<select id="combobox">')
+        .append('<input id="current-value" type="text" name="current-value" placeholder="Enter a value"></input> ');
+      
+      $('#combobox').append('<option value="">Select one...</option>');
+      
+      getColumnOrder();
+      var order = globalStore.order;
+      
+      for(var i=0; i<order.length; i++) {
+        var key = order[i];
+        var field = json.fields[key];
+        $('#combobox').append('<option value="' + key + '">' + fieldInfo[key].label + '</option>');
+      }
+      
+      $( "#combobox" ).combobox();
+      
+      $('#add-button').button().on('click', function(event) {
+        event.preventDefault();
+        
+        var field = $('#combobox').prop('value');
+        var value = $('#current-value').prop('value');
+        addFilter(field, value);
       });
       
-      initFieldHandlers();
+      $('#edit-button').button().on('click', function(event) {
+        event.preventDefault();
+        
+        var field = $('#combobox').prop('value');
+        var value = $('#current-value').prop('value');
+        var id = globalStore.fieldID;
+        
+        editFilter(id, field, value);
+      }).hide();
+      
+      // add logic editor
+      $('.filters-container')
+        .prepend('<div class="logic-container"><div class="logic-groups-container"><span style="color: grey; margin-left: 1em;">No fields selected yet</span></div></div>');
+     
+      $('.logic-container').append('<div class="add-logic-group hidden"><a href="#" class="button add-logic-button small-button">Add group</a>');
+      $('.add-logic-button').button().on('click', function(event) {
+        var group = {
+          innerLogic: 'AND',
+          outerLogic: 'AND',
+          id: logicGroups.length,
+          filters: []
+        };
+        logicGroups.push(group);
+        
+        renderLogicGroup(group);
+      });
+      
+      $('#combo-input').on( "autocompleteselect", function( event, ui ) {;
+        var key = $('#combobox').prop('value');
+        
+        if(key === undefined || !json.fields.hasOwnProperty(key)) return;
+        
+        var field = json.fields[key];
+        var type = field.type;
+        
+        var valueInput = $('#current-value');
+        
+        if(valueInput.hasClass('ui-autocomplete-input')) {
+          valueInput.autocomplete("destroy");
+        }
+        
+        // create sliders for numerical fields
+        createSlider(key);
+        
+        // autocomplete string fields
+        if(type === 'string') {
+          addAutoComplete(key);
+        }
+      });
+      
+      $(window).bind('hashchange', function() {
+        getQueryStringFromWindowHash();
+      });
+      
+      // update fields on QueryString change
+      $('#url-value')
+        .on('blur', function() {
+        parseEditedQueryString(false);
+      })
+        .on('keyup', function() {
+        parseEditedQueryString(true);
+      });
+      
+      getQueryStringFromWindowHash();
     },
     
     error: function(xhr, status ) {
@@ -237,196 +291,214 @@ function getFields() {
   });
 }
 
-// function to intialise handlers for user interaction with input fields
-function initFieldHandlers() {
+function addFilter(field, value) {
   
-  // field handlers
-  $('.field').on('focus', function() {
-    var name = this.name;
-    var check  = $('[name="check_' + name + '"]');
-    check.prop('checked', true);
-    
-    var slider = $('#' + name + '-slider-container');
-    check.prop('checked') ? slider.removeClass('hidden') : slider.addClass('hidden');
-  }).on('keyup', function(e) {
-    queryParams[this.name] = this.value;
-    updateQueryString();
-    
-    if(this.value.match(/\[.+? TO .+?\]/)) {
-      var values = this.value.split(/(\[| TO |\])/);
-      
-      if($(this).prop("rel") == 'int') {
-        $("#slide_" + this.name).slider( "values", [values[2], values[4]] );
-      }
-      else {
-        $("#slide_" + this.name).slider( "values", [values[2] * 1000, values[4] * 1000] );
-      }
+  var filter = {
+    id: ++lastFieldID,
+    field: field,
+    value: value,
+    logicGroup: 0
+  };
+  
+  filters.push(filter);
+  
+  if(!logicGroups.length) {
+    logicGroups.push({
+      innerLogic: 'AND',
+      outerLogic: 'AND',
+      id: 0,
+      filters: []
+    });
+  }
+  logicGroups[0].filters.push(filter);
+  
+  updateQueryString();
+  
+  resetFilterInput();
+}
+
+function editFilter(id, field, value) {
+  var filter;
+  
+  for(var i=0; i<filters.length; i++) {
+    if(id == filters[i].id) {
+      filter = filters[i];
+      break;
     }
-    //if(e.keyCode === 13) {
-    //  doSearch();
-    //}
-  }).on('blur', function() {
-    queryParams[this.name] = this.value;
-    updateQueryString();
-    //doSearch();
-  }).on('change', function() {
-    queryParams[this.name] = this.value;
-    updateQueryString();
-  });
+  }
   
-  // update QueryString on check on/off
-  $('.check').on('change', function() {
-    updateQueryString();
-    
-    var name = this.name.replace('check_', '');
-    
-    var slider = $('#' + name + '-slider-container');
-    $(this).prop('checked') ? slider.removeClass('hidden') : slider.addClass('hidden');
-  });
+  filter.field = field;
+  filter.value = value;
+  updateQueryString();
   
-  $(window).bind('hashchange', function() {
-    getQueryStringFromWindowHash();
-  });
+  resetFilterInput();
+}
+
+function resetFilterInput() {
+  $('#combo-input').prop('value', '');
+  $('#combobox').prop('selectedIndex',0);
+  $('#current-value').prop('value', '');
+  $('#current-slider').empty().hide();
   
-  // update fields on QueryString change
-  $('#url-value')
-  .on('blur', function() {
-    parseEditedQueryString(false);
-  })
-  .on('keyup', function() {
-    parseEditedQueryString(true);
-  });
+  $('#edit-button').hide();
+  $('#add-button').show();
+}
+
+function addAutoComplete(fieldName) {
   
-  // initialise auto-completes
-  $('.ac').on('focus', function() {
-    var fieldName = this.name;
-    var input = $(this);
+  var input = $('#current-value');
+  
+  var source = [];
+  
+  $.ajax({
+    url: baseURL + '/admin/luke',
+    type: 'GET',
+    dataType: 'json',
     
-    var source = [];
+    data: {
+      wt: 'json',
+      fl: fieldName,
+      numTerms: 100
+    },
     
-    $.ajax({
-      url: baseURL + '/admin/luke',
-      type: 'GET',
-      dataType: 'json',
+    success: function( fl ) {
+      var distinct;
       
-      data: {
-        wt: 'json',
-        fl: fieldName,
-        numTerms: 100
-      },
-      
-      success: function( fl ) {
-        var distinct;
+      for(var key in fl.fields) {
+        var field = fl.fields[key];
+        distinct = field.distinct;
         
-        for(var key in fl.fields) {
-          var field = fl.fields[key];
-          distinct = field.distinct;
-          
-          if(field.topTerms) {
-            for (var i=0; i<field.topTerms.length; i+=2) {
-              source.push(unescape(field.topTerms[i]));
-            }
+        if(field.topTerms) {
+          for (var i=0; i<field.topTerms.length; i+=2) {
+            source.push(unescape(field.topTerms[i]));
           }
         }
-        
-        if(distinct > 100) {
-          input.keyup(function() {
+      }
+      
+      if(distinct > 100) {
+        input.keyup(function() {
+          
+          if(this.value.length && this.value != this.rel) {
             
-            if(this.value.length && this.value != this.rel) {
-              
-              this.rel = this.value;
-              
-              // multi field, do normal search
-              if(fieldInfo[fieldName].multi) {                
-                $.ajax({
-                  url: baseURL + '/select',
-                  type: 'GET',
-                  dataType: 'json',
+            this.rel = this.value;
+            
+            // multi field, do normal search
+            if(fieldInfo[fieldName].multi) {                
+              $.ajax({
+                url: baseURL + '/select',
+                type: 'GET',
+                dataType: 'json',
+                
+                data: {
+                  wt: 'json',
+                  q: $('#combobox').val() + ":*" + this.value + "*",
+                  rows: 100
+                },
+                
+                success: function( res ) {
+                  source = [];
                   
-                  data: {
-                    wt: 'json',
-                    q: this.name + ":*" + this.value + "*",
-                    rows: 100
-                  },
+                  for(var i=0; i<res.response.docs.length; i++) {
+                    source.push(unescape(res.response.docs[i][fieldName]));
+                  }
                   
-                  success: function( res ) {
-                    source = [];
-                    
-                    for(var i=0; i<res.response.docs.length; i++) {
-                      source.push(unescape(res.response.docs[i][fieldName]));
+                  input.autocomplete({
+                    source: source,
+                    minLength: 0
+                  });
+                },
+                
+                error: function( xhr, status ) {
+                  console.log("Error doing search for " + this.q);
+                }
+              });
+            }
+            
+            // non-multi field, do group search
+            else {
+              $.ajax({
+                url: baseURL + '/select',
+                type: 'GET',
+                dataType: 'json',
+                
+                data: {
+                  wt: 'json',
+                  q: $('#combobox').val() + ":*" + this.value + "*",
+                  rows: 100,
+                  group: true,
+                  'group.field': $('#combobox').val()
+                },
+                
+                success: function( res ) {
+                  source = [];
+                  
+                  for(var key in res.grouped) {
+                    for(var i=0; i<res.grouped[key].groups.length; i++) {
+                      source.push(unescape(res.grouped[key].groups[i].groupValue));
                     }
-                    
                     input.autocomplete({
                       source: source,
                       minLength: 0
                     });
-                  },
-                  
-                  error: function( xhr, status ) {
-                    console.log("Error doing search for " + this.q);
                   }
-                });
-              }
-              
-              // non-multi field, do group search
-              else {
-                $.ajax({
-                  url: baseURL + '/select',
-                  type: 'GET',
-                  dataType: 'json',
-                  
-                  data: {
-                    wt: 'json',
-                    q: this.name + ":*" + this.value + "*",
-                    rows: 100,
-                    group: true,
-                    'group.field': this.name
-                  },
-                  
-                  success: function( res ) {
-                    source = [];
-                    
-                    for(var key in res.grouped) {
-                      for(var i=0; i<res.grouped[key].groups.length; i++) {
-                        source.push(unescape(res.grouped[key].groups[i].groupValue));
-                      }
-                      input.autocomplete({
-                        source: source,
-                        minLength: 0
-                      });
-                    }
-                  },
-                  
-                  error: function( xhr, status ) {
-                    console.log("Error doing group search for " + this.q);
-                  }
-                });
-              }
+                },
+                
+                error: function( xhr, status ) {
+                  console.log("Error doing group search for " + this.q);
+                }
+              });
             }
-          });
-        }
-        
-        else {
-          input.autocomplete({
-            source: source,
-            minLength: 0
-          });
-        }
+          }
+        });
       }
-    });
+      
+      //else {
+        input.autocomplete({
+          source: source,
+          minLength: 0
+        });
+      //}
+    }
   });
-  
-  getQueryStringFromWindowHash();
 }
 
 // create jQueryUI slides for numeric fields
-function createSlider(type, key) {
+function createSlider(key) {
+  
+  var type = fieldInfo[key].type;
+  
+  // sliders for fields with defined ranges
+  if(fieldInfo[key].range && fieldInfo[key].range.length) {
+    $('#current-slider').empty().append('<div class="slider-container" id="slider-container">').show();
+    $('#slider-container').empty().append('<div class="slider" id="slide">');
+    
+    if(type === 'int') {
+      $("#slide").slider({
+        range: true,
+        min: fieldInfo[key].range[0],
+        max: fieldInfo[key].range[1],
+        slide: function( event, ui ) {
+          $('#current-value').val("[" + ui.values[0] + " TO " + ui.values[1] + "]");
+        }
+      });
+    }
+    else {
+      $("#slide").slider({
+        range: true,
+        min: fieldInfo[key].range[0] * 1000,
+        max: fieldInfo[key].range[1] * 1000,
+        slide: function( event, ui ) {
+          $('#current-value').val("[" + (ui.values[0] / 1000) + " TO " + (ui.values[1] / 1000) + "]");
+        }
+      });
+    }
+  }
   
   // create slider for int types
-  if(type === 'int') {
+  else if(type === 'int') {
     
     // loading placeholder
-    $('#' + key + '-container').append('<div class="slider-container hidden" id="' + key + '-slider-container"><img src="img/ajax-loader.gif"/> <small>Loading stats</small>');
+    $('#current-slider').empty().append('<div class="slider-container" id="slider-container"><div class="loading"><img src="img/ajax-loader.gif"/> Getting field statistics</div>').show();
     
     // request min/max from stats
     $.ajax({
@@ -445,39 +517,24 @@ function createSlider(type, key) {
       key: key,
       
       success: function( r ) {
-        $('#' + this.key + '-slider-container').empty().append('<div rel="' + type + '" class="slider" id="slide_' + this.key + '">');
-        $("#slide_" + this.key).slider({
+        fieldInfo[this.key].range = [
+          r.stats.stats_fields[this.key].min, 
+          r.stats.stats_fields[this.key].max
+        ];
+        
+        $('#slider-container').empty().append('<div rel="' + type + '" class="slider" id="slide">');
+        $("#slide").slider({
           range: true,
-          min: r.stats.stats_fields[this.key].min,
-          max: r.stats.stats_fields[this.key].max,
+          min: fieldInfo[this.key].range[0],
+          max: fieldInfo[this.key].range[1],
           slide: function( event, ui ) {
-            var f = this.id.replace('slide_', '');
-            $('#' + f).val("[" + ui.values[0] + " TO " + ui.values[1] + "]");
-            queryParams[f] = $('#' + f).val();
-            updateQueryString();
+            $('#current-value').val("[" + ui.values[0] + " TO " + ui.values[1] + "]");
           }
         });
       },
       
       error: function( xhr, status ) {
         console.log("Error");
-      }
-    });
-  }
-  
-  // sliders for fields with defined ranges
-  else if(fieldInfo[key].range && fieldInfo[key].range.length) {
-    $('#' + key + '-container').append('<div class="slider-container hidden" id="' + key + '-slider-container">');
-    $('#' + key + '-slider-container').empty().append('<div class="slider" id="slide_' + key + '">');
-    $("#slide_" + key).slider({
-      range: true,
-      min: fieldInfo[key].range[0] * 1000,
-      max: fieldInfo[key].range[1] * 1000,
-      slide: function( event, ui ) {
-        var f = this.id.replace('slide_', '');
-        $('#' + f).val("[" + (ui.values[0] / 1000) + " TO " + (ui.values[1] / 1000) + "]");
-        queryParams[f] = $('#' + f).val();
-        updateQueryString();
       }
     });
   }
@@ -505,14 +562,14 @@ function initButtons() {
       buttons: {
         "Reset": function() {
           event.preventDefault();
-          queryParams = {};
-          logicGroups = [];
-          for(var k in fieldInfo) {
-            fieldInfo[k].logicGroup = undefined;
-          }
-          updateQueryString();
-          getFields();
+          
           window.location.hash = '';
+          setQueryURL('');
+          resetFilterInput();
+          filters = [];
+          logicGroups = [];
+          
+          updateQueryString();
           doSearch();
           $(this).dialog("close");
         },
@@ -590,48 +647,26 @@ function doSearch() {
 // updates QueryString and logic diagram
 function updateQueryString(noRedraw) {
   
-  // render groups
-  renderAllLogicGroups(noRedraw);
-  
   // update QueryString field
   setQueryURL(createQueryString());
+  
+  // render groups
+  renderAllLogicGroups(noRedraw);
 }
 
-// creates query string from queryParams and logicGroups
+// creates query string from fields and logicGroups
 function createQueryString() {
   var qString = '';
   
-  // init logicGroups
-  if(!logicGroups.length) {
-    logicGroups.push({
-      innerLogic: 'AND',
-      outerLogic: 'AND',
-      id: 0,
-      fields: []
-    });
-  }
-  
-  // drop fields into default logic group
-  for(var key in queryParams) {
-    if(typeof fieldInfo[key].logicGroup === 'undefined') {
-      fieldInfo[key].logicGroup = 0;
-      logicGroups[0].fields.push(key);
-    }
-  }
-  
   for(var i=0; i<logicGroups.length; i++) {
     var group = logicGroups[i];
-    if(!group.fields.length) continue;
+    if(!group.filters.length) continue;
     
     var qStringPart = '';
     
-    for(var j=0; j<group.fields.length; j++) {
-      var key = group.fields[j];
-      
-      // check if it's checked
-      if($('[name=check_' + key + ']').prop('checked') && queryParams[key].length) {
-        qStringPart = qStringPart + (qStringPart.length ? ' ' + group.innerLogic + ' ' : '') + key + ':' + queryParams[key].replace(':', '\:');
-      }
+    for(var j=0; j<group.filters.length; j++) {
+      var filter = group.filters[j];
+      qStringPart = qStringPart + (qStringPart.length ? ' ' + group.innerLogic + ' ' : '') + filter.field + ':' + filter.value.replace(':', '\:');
     }
     
     if(qStringPart.length) {
@@ -695,11 +730,7 @@ function parseEditedQueryString(noRedraw) {
   
   // reset everything
   logicGroups = [];
-  
-  for(var field in fieldInfo) {
-    $('[name=check_' + field + ']').prop('checked', false)
-    fieldInfo[field].logicGroup = undefined;
-  }  
+  filters = [];
   
   for(var i=0; i<groups.length; i++) {
     var group = groups[i];
@@ -741,7 +772,7 @@ function parseEditedQueryString(noRedraw) {
         split = [group];
       }
       
-      var fields = [];
+      var tmpfilters = [];
       
       for(var j=0; j<split.length; j++) {
         var tmp = split[j].split(':');
@@ -751,20 +782,16 @@ function parseEditedQueryString(noRedraw) {
         // make sure field exists
         if(fieldInfo.hasOwnProperty(field)) {
           
-          // add to fields list for logicGroups
-          fields.push(field);
+          var filter = {
+            id: ++lastFieldID,
+            field: field,
+            value: value,
+            logicGroup: groupID
+          };
           
-          // update value in HTML form field
-          $('input#' + field)[0].value = value;
-          queryParams[field] = value;
-          
-          // update logic group in fieldInfo
-          fieldInfo[field].logicGroup = groupID;
-          
-          // change checked status
-          $('[name=check_' + field + ']').prop('checked', 'checked');
-          
-          //console.log("Changing " + field + " to " + value);
+          // add to filters list for logicGroups
+          tmpfilters.push(filter);
+          filters.push(filter);
         }
       }
       
@@ -773,7 +800,7 @@ function parseEditedQueryString(noRedraw) {
         innerLogic: innerLogic,
         outerLogic: outerLogic,
         id: groupID++,
-        fields: fields
+        filters: tmpfilters
       });
     }
   }
@@ -793,9 +820,6 @@ function renderResults(text) {
   
   // parse JSON
   var json = JSON.parse(text);
-  
-  // add query time
-  $('.formatted').append('<div style="font-size:small; color: grey; float:right; clear: both; padding-bottom:1em;">Query time: ' + (json.responseHeader.QTime / 1000) + 's');
  
   // download section
   var numFound = json.response.numFound;
@@ -823,9 +847,12 @@ function renderResults(text) {
   // start table
   if(numFound) {
     renderTable();
+    
+    // add query time
+    $('.formatted').append('<div style="font-size:small; color: grey; clear: both; padding-top:1em;">Query time: ' + (json.responseHeader.QTime / 1000) + 's');
   }
   else {
-    $('.formatted').append('No data');
+    $('.formatted').append('Start searching to see results here!');
   }
   
   $('#results-accordion').accordion({
@@ -1101,31 +1128,33 @@ function renderAllLogicGroups(noRedraw) {
   // set firstGroup to undefined
   globalStore.firstGroup = undefined;
   
-  var totalFieldsAdded = 0;
+  var totalFiltersAdded = 0;
   
   for(var i=0; i<logicGroups.length; i++) {
     var group = logicGroups[i];
-    if(!group.fields.length) continue;
+    if(!group.filters.length) continue;
     
     var listItems = '';
-    var fieldsAdded = 0;
+    var filtersAdded = 0;
     
-    for(var j=0; j<group.fields.length; j++) {
-      var key = group.fields[j];
+    for(var j=0; j<group.filters.length; j++) {
+      var filter = group.filters[j];
       
-      // check if it's checked
-      if($('[name=check_' + key + ']').prop('checked') && queryParams[key] && queryParams[key].length) {
-        if(!noRedraw) 
-          listItems = listItems + '<li id="draggable-' + key + '" title="' + fieldInfo[key].label + '"> ' +
-            '<img src="img/move_icon.jpg" style="height:12px;" /> ' +
-            '<b>' + key + '</b>:' + queryParams[key] +
-          '</li>';
-        
-        fieldsAdded++;
-      }
+      if(!noRedraw) 
+        listItems = listItems + '<li id="draggable-' + filter.id + '" title="' + fieldInfo[filter.field].label + '"> ' +
+          '<div><img src="img/move_icon.jpg" style="height:12px;" /> ' +
+          '<b>' + filter.field + '</b>:' + filter.value + '</div>' +
+          '<div style="clear:both;">&nbsp;<div style="float:right;">' +
+            '<a href="javascript:" id="edit-filter-' + filter.id + '" title="Edit this filter">Edit</a>' +
+            '<a style="display: none" href="javascript:" id="cancel-filter-' + filter.id + '" title="Cancel editing of this filter">Cancel</a> | ' +
+            '<a href="javascript:" id="delete-filter-' + filter.id + '" title="Delete this filter">Delete</a>' +
+          '</div></div>' +
+        '</li>';
+      
+      filtersAdded++;
     }
     
-    if(fieldsAdded) {
+    if(filtersAdded) {
       if(typeof(globalStore.firstGroup) === 'undefined') globalStore.firstGroup = group.id;
       
       if(!noRedraw) renderLogicGroup(group);
@@ -1133,14 +1162,22 @@ function renderAllLogicGroups(noRedraw) {
       var list = $('#logic-group-list' + group.id);
       list.append(listItems);
       if(!noRedraw) list.sortable().disableSelection();
-      if(fieldsAdded > 1) $('#logic-group' + group.id).find('.inner-logic').removeClass('hidden');
+      if(filtersAdded > 1) $('#logic-group' + group.id).find('.inner-logic').removeClass('hidden');
     }
     
-    totalFieldsAdded = totalFieldsAdded + fieldsAdded;
+    totalFiltersAdded = totalFiltersAdded + filtersAdded;
   }
   
   // show button to add logic group if we have more than 1 field
-  if(totalFieldsAdded > 1) $('.add-logic-group').removeClass('hidden');
+  if(totalFiltersAdded > 1) {
+    $('.add-logic-group').removeClass('hidden');
+  }
+  
+  //else if(totalFiltersAdded == 0) {
+  //  $('.logic-groups-container').append('<span style="color: grey; margin-left: 1em;">No fields selected yet</span>');
+  //}
+  
+  addFilterControls();
   
   // connect lists    
   if(!noRedraw) $('.logic-group-list').sortable( "option", "connectWith", ".logic-group-list");
@@ -1155,9 +1192,9 @@ function renderLogicGroup(group) {
     container.
       append('<div class="logic-connector">').
       append('<span class="outer-logic">' + 
-        '<input type="radio" value="AND" name="outer_' + group.id + '" id="outer1_' + group.id + '" ' + (group.outerLogic === 'AND' ? 'checked="checked"' : '') +' /><label for="outer1_' + group.id + '">AND</label>' +
-        '<input type="radio" value="OR" name="outer_' + group.id + '" id="outer2_' + group.id + '" ' + (group.outerLogic === 'OR' ? 'checked="checked"' : '') +' /><label for="outer2_' + group.id + '">OR</label>' +
-        '<input type="radio" value="NOT" name="outer_' + group.id + '" id="outer3_' + group.id + '" ' + (group.outerLogic === 'NOT' ? 'checked="checked"' : '') +' /><label for="outer3_' + group.id + '">NOT</label>'
+        '<input type="radio" value="AND" name="outer_' + group.id + '" id="outer1_' + group.id + '" ' + (group.outerLogic === 'AND' ? 'checked="checked"' : '') +' /><label for="outer1_' + group.id + '" class="small-button">AND</label>' +
+        '<input type="radio" value="OR" name="outer_' + group.id + '" id="outer2_' + group.id + '" ' + (group.outerLogic === 'OR' ? 'checked="checked"' : '') +' /><label for="outer2_' + group.id + '" class="small-button">OR</label>' +
+        '<input type="radio" value="NOT" name="outer_' + group.id + '" id="outer3_' + group.id + '" ' + (group.outerLogic === 'NOT' ? 'checked="checked"' : '') +' /><label for="outer3_' + group.id + '" class="small-button">NOT</label>'
       ).append('<div class="logic-connector">');
     
     // outer-logic handler
@@ -1212,14 +1249,20 @@ function renderLogicGroup(group) {
       
       // remove from old group
       var tmp = [];
-      for(var i=0; i<logicGroups[oldGroupId].fields.length; i++) {
-        if(key != logicGroups[oldGroupId].fields[i]) tmp.push(logicGroups[oldGroupId].fields[i]);
+      var filter;
+      for(var i=0; i<logicGroups[oldGroupId].filters.length; i++) {
+        if(key != logicGroups[oldGroupId].filters[i].id) {
+          tmp.push(logicGroups[oldGroupId].filters[i]);
+        }
+        else {
+          filter = logicGroups[oldGroupId].filters[i];
+        }
       }
-      logicGroups[oldGroupId].fields = tmp;
+      logicGroups[oldGroupId].filters = tmp;
       
       // add to new group
-      logicGroups[newGroupId].fields.push(key);
-      fieldInfo[key].logicGroup = newGroupId;
+      logicGroups[newGroupId].filters.push(filter);
+      filter.logicGroup = newGroupId;
       
       updateQueryString();
       
@@ -1233,6 +1276,113 @@ function renderLogicGroup(group) {
   
   // connect lists
   $('.logic-group-list').sortable( "option", "connectWith", ".logic-group-list");
+}
+
+// edit, cancel and delete buttons
+function addFilterControls() {
+
+  $("[id^=edit-filter-]").on('click', function(event) {
+    event.preventDefault();
+    
+    var id = this.id.replace('edit-filter-', '');
+    globalStore.fieldID = id;
+    
+    $("[id^=edit-filter-]").show();
+    $("[id^=cancel-filter-]").hide();
+    $(this).hide();
+    $("#cancel-filter-" + id).show();
+    
+    var filter;
+    
+    // grab filter and remove from filters array
+    for(var i=0; i<filters.length; i++) {
+      if(filters[i].id == id) {
+        filter = filters[i];
+        break;
+      }
+    }
+    
+    $('#add-button').hide();
+    $('#edit-button').show();
+    
+    $('#combobox').val(filter.field);
+    $('#combo-input').val(fieldInfo[filter.field].label);
+    $('#current-value').val(filter.value);
+    
+    createSlider(filter.field);
+    if(fieldInfo[filter.field].type === 'string') {
+      addAutoComplete(filter.field);
+    }
+    
+    if(filter.value.match(/\[.+? TO .+?\]/)) {
+      var values = filter.value.split(/(\[| TO |\])/);
+      
+      if(fieldInfo[filter.field].type === 'int') {
+        $("#slide").slider( "values", [values[2], values[4]] );
+      }
+      else {
+        $("#slide").slider( "values", [values[2] * 1000, values[4] * 1000] );
+      }
+    }
+  });
+  
+  $("[id^=cancel-filter-]").on('click', function(event) {
+    event.preventDefault();
+    
+    resetFilterInput();
+    $(this).hide();
+    $("[id^=edit-filter-]").show();
+  });
+  
+  $("[id^=delete-filter-]").on('click', function(event) {
+    event.preventDefault();
+    
+    var id = this.id.replace('delete-filter-', '');
+    
+    $('body').append('<div id="delete-confirm" title="Delete this filter?"></div>');
+    $('#delete-confirm').dialog({
+      resizable: false,
+      height: 140,
+      modal: true,
+      buttons: {
+        "Delete": function() {
+          var filter;
+          var tmp = [];
+          
+          // grab filter and remove from filters array
+          for(var i=0; i<filters.length; i++) {
+            if(filters[i].id == id) {
+              filter = filters[i];
+            }
+            else {
+              tmp.push(filters[i]);
+            }
+          }
+          
+          filters = tmp;
+          var gtmp = [];
+          
+          // remove it from logicGroups
+          for(var i=0; i<logicGroups[filter.logicGroup].filters.length; i++) {
+            if(logicGroups[filter.logicGroup].filters[i].id != id) {
+              gtmp.push(logicGroups[filter.logicGroup].filters[i]);
+            }
+          }
+          
+          logicGroups[filter.logicGroup].filters = gtmp;
+          
+          resetFilterInput();
+          
+          // redraw
+          updateQueryString();
+          $(this).dialog("close");
+        },
+        "Cancel": function() {
+          $(this).dialog("close");
+        }
+      }
+    });
+  });
 }
 
 function updateDownloadURL(event) {
@@ -1290,3 +1440,134 @@ function readCookie(name) {
 function eraseCookie(name) {
   createCookie(name, "", -1);
 }
+
+// combobox code
+(function( $ ) {
+  $.widget( "custom.combobox", {
+    _create: function() {
+      this.wrapper = $( "<span>" )
+        .addClass( "custom-combobox" )
+        .insertAfter( this.element );
+
+      this.element.hide();
+      this._createAutocomplete();
+      this._createShowAllButton();
+    },
+
+    _createAutocomplete: function() {
+      var selected = this.element.children( ":selected" ),
+        value = selected.val() ? selected.text() : "";
+
+      this.input = $( '<input placeholder="Select a field" id="combo-input">' )
+        .appendTo( this.wrapper )
+        .val( value )
+        .attr( "title", "" )
+        //.addClass( "custom-combobox-input ui-widget ui-widget-content ui-state-default ui-corner-left" )
+        .autocomplete({
+          delay: 0,
+          minLength: 0,
+          source: $.proxy( this, "_source" )
+        })
+        .tooltip({
+          tooltipClass: "ui-state-highlight"
+        });
+
+      this._on( this.input, {
+        autocompleteselect: function( event, ui ) {
+          ui.item.option.selected = true;
+          this._trigger( "select", event, {
+            item: ui.item.option
+          });
+        },
+
+        autocompletechange: "_removeIfInvalid"
+      });
+    },
+
+    _createShowAllButton: function() {
+      var input = this.input,
+        wasOpen = false;
+
+      $( "<a>" )
+        .attr( "tabIndex", -1 )
+        .attr( "title", "Show All Items" )
+        //.tooltip()
+        .appendTo( this.wrapper )
+        .button({
+          icons: {
+            primary: "ui-icon-triangle-1-s"
+          },
+          text: false
+        })
+        .removeClass( "ui-corner-all" )
+        .addClass( "custom-combobox- ui-corner-right" )
+        .mousedown(function() {
+          wasOpen = input.autocomplete( "widget" ).is( ":visible" );
+        })
+        .click(function() {
+          input.focus();
+
+          // Close if already visible
+          if ( wasOpen ) {
+            return;
+          }
+
+          // Pass empty string as value to search for, displaying all results
+          input.autocomplete( "search", "" );
+        });
+    },
+
+    _source: function( request, response ) {
+      var matcher = new RegExp( $.ui.autocomplete.escapeRegex(request.term), "i" );
+      response( this.element.children( "option" ).map(function() {
+        var text = $( this ).text();
+        if ( this.value && ( !request.term || matcher.test(text) ) )
+          return {
+            label: text,
+            value: text,
+            option: this
+          };
+      }) );
+    },
+
+    _removeIfInvalid: function( event, ui ) {
+
+      // Selected an item, nothing to do
+      if ( ui.item ) {
+        return;
+      }
+
+      // Search for a match (case-insensitive)
+      var value = this.input.val(),
+        valueLowerCase = value.toLowerCase(),
+        valid = false;
+      this.element.children( "option" ).each(function() {
+        if ( $( this ).text().toLowerCase() === valueLowerCase ) {
+          this.selected = valid = true;
+          return false;
+        }
+      });
+
+      // Found a match, nothing to do
+      if ( valid ) {
+        return;
+      }
+
+      // Remove invalid value
+      this.input
+        .val( "" )
+        .attr( "title", value + " didn't match any item" )
+        .tooltip( "open" );
+      this.element.val( "" );
+      this._delay(function() {
+        this.input.tooltip( "close" ).attr( "title", "" );
+      }, 2500 );
+      this.input.data( "ui-autocomplete" ).term = "";
+    },
+
+    _destroy: function() {
+      this.wrapper.remove();
+      this.element.show();
+    }
+  });
+})( jQuery );
