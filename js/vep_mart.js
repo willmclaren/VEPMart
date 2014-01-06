@@ -3,7 +3,7 @@ var baseURL = '/solr/vep';
 var configURL = 'config.xml';
 
 // global variables
-var filters = [];       // filters to apply
+var filters = {};       // filters to apply
 var globalStore = {};   // general misc global store, could maybe use window instead?
 var logicGroups = [];   // logic groups for logic editor
 var fieldInfo = {};     // field information
@@ -293,14 +293,16 @@ function getFields() {
 
 function addFilter(field, value) {
   
+  var filterID = ++lastFieldID;
+  
   var filter = {
-    id: ++lastFieldID,
+    id: filterID,
     field: field,
     value: value,
     logicGroup: 0
   };
   
-  filters.push(filter);
+  filters[filterID] = filter;
   
   if(!logicGroups.length) {
     logicGroups.push({
@@ -315,23 +317,20 @@ function addFilter(field, value) {
   updateQueryString();
   
   resetFilterInput();
+  
+  highlightSearch();
 }
 
 function editFilter(id, field, value) {
-  var filter;
-  
-  for(var i=0; i<filters.length; i++) {
-    if(id == filters[i].id) {
-      filter = filters[i];
-      break;
-    }
-  }
+  var filter = filters[id];
   
   filter.field = field;
   filter.value = value;
   updateQueryString();
   
   resetFilterInput();
+  
+  highlightSearch();
 }
 
 function resetFilterInput() {
@@ -548,6 +547,8 @@ function initButtons() {
     
     window.location.hash = createQueryString();
     doSearch();
+    
+    $(this).removeClass('highlight');
   });
   
   // reset button
@@ -566,12 +567,14 @@ function initButtons() {
           window.location.hash = '';
           setQueryURL('');
           resetFilterInput();
-          filters = [];
+          filters = {};
           logicGroups = [];
           
           updateQueryString();
           doSearch();
           $(this).dialog("close");
+          
+          $('.search-button').removeClass('highlight');
         },
         "Cancel": function() {
           $(this).dialog("close");
@@ -615,6 +618,9 @@ function initButtons() {
   });
 }
 
+function highlightSearch() {
+  $('.search-button').addClass('highlight');
+}
 
 // main search function
 // passes on to renderResults
@@ -730,7 +736,7 @@ function parseEditedQueryString(noRedraw) {
   
   // reset everything
   logicGroups = [];
-  filters = [];
+  filters = {};
   
   for(var i=0; i<groups.length; i++) {
     var group = groups[i];
@@ -781,9 +787,10 @@ function parseEditedQueryString(noRedraw) {
         
         // make sure field exists
         if(fieldInfo.hasOwnProperty(field)) {
+          var filterID = ++lastFieldID;
           
           var filter = {
-            id: ++lastFieldID,
+            id: filterID,
             field: field,
             value: value,
             logicGroup: groupID
@@ -791,7 +798,7 @@ function parseEditedQueryString(noRedraw) {
           
           // add to filters list for logicGroups
           tmpfilters.push(filter);
-          filters.push(filter);
+          filters[filterID] = filter;
         }
       }
       
@@ -840,7 +847,7 @@ function renderResults(text) {
   $('.download').append(
     '<div style="clear:both">URL for this query: <input readonly="readonly" id="exturl" class="url-value" type="text" value="' +
     window.location.href.replace(/\#.*/g, '') + '#' +
-    $('#url-value')[0].value.replace(baseURL, '').replace('/select?q=', '') + '"></div>'
+    $('#url-value')[0].value.replace(baseURL, '').replace('/select', '').replace('?q=', '') + '"></div>'
   );
   $('#exturl').click(function() { $(this).select(); });
   
@@ -891,8 +898,8 @@ function renderTable() {
     sScrollX: "100%",
     bFilter: false,
     bSort: false,
-    sPaginationType: "full_numbers",
-    bStateSave: true,
+    //sPaginationType: "full_numbers",
+    //bStateSave: true,
     bScrollInfinite: true,
     bScrollCollapse: true,
     sScrollY: "210px",
@@ -1146,7 +1153,7 @@ function renderAllLogicGroups(noRedraw) {
           '<b>' + filter.field + '</b>:' + filter.value + '</div>' +
           '<div style="clear:both;">&nbsp;<div style="float:right;">' +
             '<a href="javascript:" id="edit-filter-' + filter.id + '" title="Edit this filter">Edit</a>' +
-            '<a style="display: none" href="javascript:" id="cancel-filter-' + filter.id + '" title="Cancel editing of this filter">Cancel</a> | ' +
+            '<a style="display: none" href="javascript:" id="cancel-filter-' + filter.id + '" title="Cancel editing of this filter">Cancel edit</a> | ' +
             '<a href="javascript:" id="delete-filter-' + filter.id + '" title="Delete this filter">Delete</a>' +
           '</div></div>' +
         '</li>';
@@ -1237,36 +1244,30 @@ function renderLogicGroup(group) {
   // make sortable list
   $('#logic-group-list' + group.id).sortable({
     
-    // receive handler for when a field is dropped on a group
-    receive: function(event, ui) {
+    // stop handler for when a filter is dropped
+    stop: function(event, ui) {
       var item = ui.item;
-      var sender = ui.sender;
       
-      // get IDs and keys
-      var key = item.prop("id").replace('draggable-', '');
-      var oldGroupId = sender.prop("id").replace('logic-group-list', '');
-      var newGroupId = this.id.replace('logic-group-list', '');
-      
-      // remove from old group
-      var tmp = [];
-      var filter;
-      for(var i=0; i<logicGroups[oldGroupId].filters.length; i++) {
-        if(key != logicGroups[oldGroupId].filters[i].id) {
-          tmp.push(logicGroups[oldGroupId].filters[i]);
-        }
-        else {
-          filter = logicGroups[oldGroupId].filters[i];
-        }
-      }
-      logicGroups[oldGroupId].filters = tmp;
-      
-      // add to new group
-      logicGroups[newGroupId].filters.push(filter);
-      filter.logicGroup = newGroupId;
+      // iterate over logic groups
+      item.parent().parent().parent().find('div.logic-group').each(function() {
+        var groupDiv = $(this);
+        var groupId = groupDiv.prop('id').replace('logic-group', '');
+        
+        var tmp = [];
+        
+        // get order of filters
+        groupDiv.find('li').each(function() {
+          var filterId = $(this).prop('id').replace('draggable-', '');
+          var filter = filters[filterId];
+          filter.logicGroup = groupId;
+          tmp.push(filter);
+        });
+        
+        // add filters to logic group
+        logicGroups[groupId].filters = tmp;
+      });
       
       updateQueryString();
-      
-      //doSearch();
     }
   }).disableSelection();
   
@@ -1292,15 +1293,7 @@ function addFilterControls() {
     $(this).hide();
     $("#cancel-filter-" + id).show();
     
-    var filter;
-    
-    // grab filter and remove from filters array
-    for(var i=0; i<filters.length; i++) {
-      if(filters[i].id == id) {
-        filter = filters[i];
-        break;
-      }
-    }
+    var filter = filters[id];
     
     $('#add-button').hide();
     $('#edit-button').show();
@@ -1346,36 +1339,29 @@ function addFilterControls() {
       modal: true,
       buttons: {
         "Delete": function() {
-          var filter;
-          var tmp = [];
           
-          // grab filter and remove from filters array
-          for(var i=0; i<filters.length; i++) {
-            if(filters[i].id == id) {
-              filter = filters[i];
-            }
-            else {
-              tmp.push(filters[i]);
-            }
-          }
+          // grab groupID before deleting
+          var groupID = filters[id].logicGroup;
+          delete filters[id];
           
-          filters = tmp;
           var gtmp = [];
           
           // remove it from logicGroups
-          for(var i=0; i<logicGroups[filter.logicGroup].filters.length; i++) {
-            if(logicGroups[filter.logicGroup].filters[i].id != id) {
-              gtmp.push(logicGroups[filter.logicGroup].filters[i]);
+          for(var i=0; i<logicGroups[groupID].filters.length; i++) {
+            if(logicGroups[groupID].filters[i].id != id) {
+              gtmp.push(logicGroups[groupID].filters[i]);
             }
           }
           
-          logicGroups[filter.logicGroup].filters = gtmp;
+          logicGroups[groupID].filters = gtmp;
           
           resetFilterInput();
           
           // redraw
           updateQueryString();
           $(this).dialog("close");
+          
+          highlightSearch();
         },
         "Cancel": function() {
           $(this).dialog("close");
