@@ -1,14 +1,17 @@
-// configure me!
-var baseURL = '/solr/vep';
-var configURL = 'config.xml';
-
-// global variables
-var filters = {};       // filters to apply
-var globalStore = {};   // general misc global store, could maybe use window instead?
-var logicGroups = [];   // logic groups for logic editor
-var fieldInfo = {};     // field information
-var groups = [];        // field groupings
-var lastFieldID = 0;
+// global store variable
+var globalStore = {
+  
+  // configure me!
+  baseURL: '/solr/vep',
+  configURL: 'config.xml',
+  
+  // leave these
+  filters: {},
+  logicGroups: [],
+  fieldInfo: {},
+  groups: [],
+  lastFieldID: 0
+};
 
 $(document).ready(function() {
   
@@ -16,7 +19,7 @@ $(document).ready(function() {
   updateQueryString();
   
   // parse configuration from XML
-  parseConfig(configURL);
+  parseConfig(globalStore.configURL);
   
   // get fields
   getFields();
@@ -64,7 +67,7 @@ function parseConfig(url) {
             
             var name = $(this).attr('name');
             
-            fieldInfo[name] = {
+            globalStore.fieldInfo[name] = {
               group: group.name,
               sub: sub,
               
@@ -75,12 +78,12 @@ function parseConfig(url) {
             };
             
             if(hidden.hasOwnProperty(name)) {
-              fieldInfo[name].hidden = true;
+              globalStore.fieldInfo[name].hidden = true;
             }
           })
         })
         
-        groups.push(group);
+        globalStore.groups.push(group);
       });
       
       // get order from cookie
@@ -94,18 +97,18 @@ function parseConfig(url) {
       // otherwise construct it from the order specified in config XML
       else {
         var fields = [];
-        for(var k in fieldInfo) fields.push(k);
-        fields = fields.sort(function(a,b) { return (fieldInfo[a].order || 999) - (fieldInfo[b].order || 999) });
+        for(var k in globalStore.fieldInfo) fields.push(k);
+        fields = fields.sort(function(a,b) { return (globalStore.fieldInfo[a].order || 999) - (globalStore.fieldInfo[b].order || 999) });
         
-        for(var i=0; i<groups.length; i++) {
-          var group = groups[i];
+        for(var i=0; i<globalStore.groups.length; i++) {
+          var group = globalStore.groups[i];
           
-          for(var j=0; j<groups[i].subs.length; j++) {
+          for(var j=0; j<globalStore.groups[i].subs.length; j++) {
             for(var k=0; k<fields.length; k++) {
               var field = fields[k];
-              var thisSub = fieldInfo[field].sub || 'Other';
+              var thisSub = globalStore.fieldInfo[field].sub || 'Other';
               
-              if(fieldInfo[field].group === group.name && thisSub === groups[i].subs[j]) {
+              if(globalStore.fieldInfo[field].group === group.name && thisSub === globalStore.groups[i].subs[j]) {
                 order.push(field);
               }
             }
@@ -147,7 +150,7 @@ function createFooter(json) {
 
 function getFields() {
   $.ajax({
-    url: baseURL + '/admin/luke',
+    url: globalStore.baseURL + '/admin/luke',
     type: 'GET',
     dataType: 'json',
     
@@ -160,22 +163,22 @@ function getFields() {
       // add fields
       var fields = [];
       for(var k in json.fields) {
-        if(!fieldInfo[k]) continue;
+        if(!globalStore.fieldInfo[k]) continue;
         fields.push(k);
       }
       
       // sort fields using order from config
-      fields = fields.sort(function(a,b) { return (fieldInfo[a].order || 999) - (fieldInfo[b].order || 999) });
+      fields = fields.sort(function(a,b) { return (globalStore.fieldInfo[a].order || 999) - (globalStore.fieldInfo[b].order || 999) });
       
       for(var k=0; k<fields.length; k++) {
         var key = fields[k];
         var field = json.fields[key];
         var type = field.type;
-        if(!fieldInfo[key]) continue;
+        if(!globalStore.fieldInfo[key]) continue;
         
         // store type and whether it's a multi index
-        fieldInfo[key].type = type;
-        fieldInfo[key].multi = field.schema.match(/M/) ? true : false;
+        globalStore.fieldInfo[key].type = type;
+        globalStore.fieldInfo[key].multi = field.schema.match(/M/) ? true : false;
       }
       
       // write footer
@@ -206,7 +209,7 @@ function getFields() {
       for(var i=0; i<order.length; i++) {
         var key = order[i];
         var field = json.fields[key];
-        $('#combobox').append('<option value="' + key + '">' + fieldInfo[key].label + '</option>');
+        $('#combobox').append('<option value="' + key + '">' + globalStore.fieldInfo[key].label + '</option>');
       }
       
       $( "#combobox" ).combobox();
@@ -238,10 +241,10 @@ function getFields() {
         var group = {
           innerLogic: 'AND',
           outerLogic: 'AND',
-          id: logicGroups.length,
+          id: globalStore.logicGroups.length,
           filters: []
         };
-        logicGroups.push(group);
+        globalStore.logicGroups.push(group);
         
         renderLogicGroup(group);
       });
@@ -293,7 +296,7 @@ function getFields() {
 
 function addFilter(field, value) {
   
-  var filterID = ++lastFieldID;
+  var filterID = ++globalStore.lastFieldID;
   
   var filter = {
     id: filterID,
@@ -302,17 +305,17 @@ function addFilter(field, value) {
     logicGroup: 0
   };
   
-  filters[filterID] = filter;
+  globalStore.filters[filterID] = filter;
   
-  if(!logicGroups.length) {
-    logicGroups.push({
+  if(!globalStore.logicGroups.length) {
+    globalStore.logicGroups.push({
       innerLogic: 'AND',
       outerLogic: 'AND',
       id: 0,
       filters: []
     });
   }
-  logicGroups[0].filters.push(filter);
+  globalStore.logicGroups[0].filters.push(filter);
   
   updateQueryString();
   
@@ -322,7 +325,7 @@ function addFilter(field, value) {
 }
 
 function editFilter(id, field, value) {
-  var filter = filters[id];
+  var filter = globalStore.filters[id];
   
   filter.field = field;
   filter.value = value;
@@ -350,7 +353,7 @@ function addAutoComplete(fieldName) {
   var source = [];
   
   $.ajax({
-    url: baseURL + '/admin/luke',
+    url: globalStore.baseURL + '/admin/luke',
     type: 'GET',
     dataType: 'json',
     
@@ -382,9 +385,9 @@ function addAutoComplete(fieldName) {
             this.rel = this.value;
             
             // multi field, do normal search
-            if(fieldInfo[fieldName].multi) {                
+            if(globalStore.fieldInfo[fieldName].multi) {                
               $.ajax({
-                url: baseURL + '/select',
+                url: globalStore.baseURL + '/select',
                 type: 'GET',
                 dataType: 'json',
                 
@@ -416,7 +419,7 @@ function addAutoComplete(fieldName) {
             // non-multi field, do group search
             else {
               $.ajax({
-                url: baseURL + '/select',
+                url: globalStore.baseURL + '/select',
                 type: 'GET',
                 dataType: 'json',
                 
@@ -464,18 +467,18 @@ function addAutoComplete(fieldName) {
 // create jQueryUI slides for numeric fields
 function createSlider(key) {
   
-  var type = fieldInfo[key].type;
+  var type = globalStore.fieldInfo[key].type;
   
   // sliders for fields with defined ranges
-  if(fieldInfo[key].range && fieldInfo[key].range.length) {
+  if(globalStore.fieldInfo[key].range && globalStore.fieldInfo[key].range.length) {
     $('#current-slider').empty().append('<div class="slider-container" id="slider-container">').show();
     $('#slider-container').empty().append('<div class="slider" id="slide">');
     
     if(type === 'int') {
       $("#slide").slider({
         range: true,
-        min: fieldInfo[key].range[0],
-        max: fieldInfo[key].range[1],
+        min: globalStore.fieldInfo[key].range[0],
+        max: globalStore.fieldInfo[key].range[1],
         slide: function( event, ui ) {
           $('#current-value').val("[" + ui.values[0] + " TO " + ui.values[1] + "]");
         }
@@ -484,8 +487,8 @@ function createSlider(key) {
     else {
       $("#slide").slider({
         range: true,
-        min: fieldInfo[key].range[0] * 1000,
-        max: fieldInfo[key].range[1] * 1000,
+        min: globalStore.fieldInfo[key].range[0] * 1000,
+        max: globalStore.fieldInfo[key].range[1] * 1000,
         slide: function( event, ui ) {
           $('#current-value').val("[" + (ui.values[0] / 1000) + " TO " + (ui.values[1] / 1000) + "]");
         }
@@ -501,7 +504,7 @@ function createSlider(key) {
     
     // request min/max from stats
     $.ajax({
-      url: baseURL + '/select',
+      url: globalStore.baseURL + '/select',
       type: 'GET',
       dataType: 'json',
       
@@ -516,7 +519,7 @@ function createSlider(key) {
       key: key,
       
       success: function( r ) {
-        fieldInfo[this.key].range = [
+        globalStore.fieldInfo[this.key].range = [
           r.stats.stats_fields[this.key].min, 
           r.stats.stats_fields[this.key].max
         ];
@@ -524,8 +527,8 @@ function createSlider(key) {
         $('#slider-container').empty().append('<div rel="' + type + '" class="slider" id="slide">');
         $("#slide").slider({
           range: true,
-          min: fieldInfo[this.key].range[0],
-          max: fieldInfo[this.key].range[1],
+          min: globalStore.fieldInfo[this.key].range[0],
+          max: globalStore.fieldInfo[this.key].range[1],
           slide: function( event, ui ) {
             $('#current-value').val("[" + ui.values[0] + " TO " + ui.values[1] + "]");
           }
@@ -567,8 +570,8 @@ function initButtons() {
           window.location.hash = '';
           setQueryURL('');
           resetFilterInput();
-          filters = {};
-          logicGroups = [];
+          globalStore.filters = {};
+          globalStore.logicGroups = [];
           
           updateQueryString();
           doSearch();
@@ -664,8 +667,8 @@ function updateQueryString(noRedraw) {
 function createQueryString() {
   var qString = '';
   
-  for(var i=0; i<logicGroups.length; i++) {
-    var group = logicGroups[i];
+  for(var i=0; i<globalStore.logicGroups.length; i++) {
+    var group = globalStore.logicGroups[i];
     if(!group.filters.length) continue;
     
     var qStringPart = '';
@@ -690,10 +693,10 @@ function setQueryURL(qString) {
   var newValue;
   
   if(qString && qString.length) {
-    newValue = baseURL + '/select?q=' + qString;
+    newValue = globalStore.baseURL + '/select?q=' + qString;
   }
   else {
-    newValue = baseURL + '/select';
+    newValue = globalStore.baseURL + '/select';
   }
   
   $('#url-value')[0].value = newValue;
@@ -727,7 +730,7 @@ function getQueryStringFromWindowHash() {
 function parseEditedQueryString(noRedraw) {
   
   // get new value, remove base URL bits
-  var newValue = $('#url-value').prop('value').replace(baseURL, '').replace(/\/select(\?q\=)?/, '');
+  var newValue = $('#url-value').prop('value').replace(globalStore.baseURL, '').replace(/\/select(\?q\=)?/, '');
   
   // split on groups
   var groups = $.grep(newValue.split(/[()]/), function(a) { return a.length > 0; });
@@ -735,8 +738,8 @@ function parseEditedQueryString(noRedraw) {
   var groupID = 0;
   
   // reset everything
-  logicGroups = [];
-  filters = {};
+  globalStore.logicGroups = [];
+  globalStore.filters = {};
   
   for(var i=0; i<groups.length; i++) {
     var group = groups[i];
@@ -786,8 +789,8 @@ function parseEditedQueryString(noRedraw) {
         var value = tmp[1];
         
         // make sure field exists
-        if(fieldInfo.hasOwnProperty(field)) {
-          var filterID = ++lastFieldID;
+        if(globalStore.fieldInfo.hasOwnProperty(field)) {
+          var filterID = ++globalStore.lastFieldID;
           
           var filter = {
             id: filterID,
@@ -798,12 +801,12 @@ function parseEditedQueryString(noRedraw) {
           
           // add to filters list for logicGroups
           tmpfilters.push(filter);
-          filters[filterID] = filter;
+          globalStore.filters[filterID] = filter;
         }
       }
       
       // add logic group
-      logicGroups.push({
+      globalStore.logicGroups.push({
         innerLogic: innerLogic,
         outerLogic: outerLogic,
         id: groupID++,
@@ -847,7 +850,7 @@ function renderResults(text) {
   $('.download').append(
     '<div style="clear:both">URL for this query: <input readonly="readonly" id="exturl" class="url-value" type="text" value="' +
     window.location.href.replace(/\#.*/g, '') + '#' +
-    $('#url-value')[0].value.replace(baseURL, '').replace('/select', '').replace('?q=', '') + '"></div>'
+    $('#url-value')[0].value.replace(globalStore.baseURL, '').replace('/select', '').replace('?q=', '') + '"></div>'
   );
   $('#exturl').click(function() { $(this).select(); });
   
@@ -884,7 +887,7 @@ function renderTable() {
   var row = '';
   for(var i=0; i<order.length; i++) {
     var field = order[i];
-    row = row + '<th title="' + fieldInfo[field].label + '" rel="' + field + '">' + fieldInfo[field].header + '</th>';
+    row = row + '<th title="' + globalStore.fieldInfo[field].label + '" rel="' + field + '">' + globalStore.fieldInfo[field].header + '</th>';
   }
   
   // render table
@@ -995,7 +998,7 @@ function renderTable() {
   
   // set column vis
   for(var i=0; i<order.length; i++) {
-    table.fnSetColumnVis(i, fieldInfo[order[i]].hidden ? false : true);
+    table.fnSetColumnVis(i, globalStore.fieldInfo[order[i]].hidden ? false : true);
   }
   
   table.fnAdjustColumnSizing();
@@ -1017,7 +1020,7 @@ function getColumnOrder() {
   table.find('th').each(function() {
     // find the field from the rel
     var k = $(this).attr('rel');
-    var field = fieldInfo[k];
+    var field = globalStore.fieldInfo[k];
     
     // update field's order from current pos
     field.order = pos;
@@ -1064,7 +1067,7 @@ function configureColumns() {
     var field = globalStore.order[i];
     $('#config-col' + currentCol).append(
       '<div><label><input type="checkbox" class="conf" name="' + i + '" id="conf-' + field + '"> ' +
-      '<b>' + fieldInfo[field].header + '</b>: ' + (fieldInfo[field].label || field) + '</input></label>'
+      '<b>' + globalStore.fieldInfo[field].header + '</b>: ' + (globalStore.fieldInfo[field].label || field) + '</input></label>'
     );
   }
   
@@ -1073,18 +1076,18 @@ function configureColumns() {
     
     // initialise based on fieldInfo
     var field = this.id.replace('conf-', '');
-    if(!fieldInfo[field].hidden) $(this).prop('checked', 'checked');
+    if(!globalStore.fieldInfo[field].hidden) $(this).prop('checked', 'checked');
     
   }).on('click', function() {
     
     var field = this.id.replace('conf-', '');
     var table = $('#formatted-table').dataTable();
     if($(this).prop('checked')) {
-      fieldInfo[field].hidden = false;
+      globalStore.fieldInfo[field].hidden = false;
       table.fnSetColumnVis(this.name, true, false);
     }
     else {
-      fieldInfo[field].hidden = true;
+      globalStore.fieldInfo[field].hidden = true;
       table.fnSetColumnVis(this.name, false, false);
     }
     
@@ -1101,7 +1104,7 @@ function configureColumns() {
       "All": function() {
         $('input.conf').each(function() {
           var field = this.id.replace('conf-', '');
-          fieldInfo[field].hidden = false;
+          globalStore.fieldInfo[field].hidden = false;
           $(this).prop('checked', 'checked');
           table.fnSetColumnVis(this.name, true);
         });
@@ -1112,7 +1115,7 @@ function configureColumns() {
       "None": function() {
         $('input.conf').each(function() {
           var field = this.id.replace('conf-', '');
-          fieldInfo[field].hidden = true;
+          globalStore.fieldInfo[field].hidden = true;
           $(this).prop('checked', false);
           table.fnSetColumnVis(this.name, false);
         });
@@ -1137,8 +1140,8 @@ function renderAllLogicGroups(noRedraw) {
   
   var totalFiltersAdded = 0;
   
-  for(var i=0; i<logicGroups.length; i++) {
-    var group = logicGroups[i];
+  for(var i=0; i<globalStore.logicGroups.length; i++) {
+    var group = globalStore.logicGroups[i];
     if(!group.filters.length) continue;
     
     var listItems = '';
@@ -1148,7 +1151,7 @@ function renderAllLogicGroups(noRedraw) {
       var filter = group.filters[j];
       
       if(!noRedraw) 
-        listItems = listItems + '<li id="draggable-' + filter.id + '" title="' + fieldInfo[filter.field].label + '"> ' +
+        listItems = listItems + '<li id="draggable-' + filter.id + '" title="' + globalStore.fieldInfo[filter.field].label + '"> ' +
           '<div><img src="img/move_icon.jpg" style="height:12px;" /> ' +
           '<b>' + filter.field + '</b>:' + filter.value + '</div>' +
           '<div style="clear:both;">&nbsp;<div style="float:right;">' +
@@ -1207,7 +1210,7 @@ function renderLogicGroup(group) {
     // outer-logic handler
     $('[name="outer_' + group.id + '"]').on('change', function() {
       var id = this.name.replace('outer_', '');
-      logicGroups[id].outerLogic = this.value;
+      globalStore.logicGroups[id].outerLogic = this.value;
       updateQueryString(true);
       
       //doSearch();
@@ -1231,9 +1234,9 @@ function renderLogicGroup(group) {
   // inner-logic handler
   $('[name="inner_' + group.id + '"]').on('change', function() {
     var id = this.name.replace('inner_', '');
-    $('#logic-group' + id).removeClass(logicGroups[id].innerLogic);
+    $('#logic-group' + id).removeClass(globalStore.logicGroups[id].innerLogic);
     
-    logicGroups[id].innerLogic = this.value;
+    globalStore.logicGroups[id].innerLogic = this.value;
     $('#logic-group' + id).addClass(this.value);
     
     updateQueryString(true);
@@ -1258,13 +1261,13 @@ function renderLogicGroup(group) {
         // get order of filters
         groupDiv.find('li').each(function() {
           var filterId = $(this).prop('id').replace('draggable-', '');
-          var filter = filters[filterId];
+          var filter = globalStore.filters[filterId];
           filter.logicGroup = groupId;
           tmp.push(filter);
         });
         
         // add filters to logic group
-        logicGroups[groupId].filters = tmp;
+        globalStore.logicGroups[groupId].filters = tmp;
       });
       
       updateQueryString();
@@ -1293,24 +1296,24 @@ function addFilterControls() {
     $(this).hide();
     $("#cancel-filter-" + id).show();
     
-    var filter = filters[id];
+    var filter = globalStore.filters[id];
     
     $('#add-button').hide();
     $('#edit-button').show();
     
     $('#combobox').val(filter.field);
-    $('#combo-input').val(fieldInfo[filter.field].label);
+    $('#combo-input').val(globalStore.fieldInfo[filter.field].label);
     $('#current-value').val(filter.value);
     
     createSlider(filter.field);
-    if(fieldInfo[filter.field].type === 'string') {
+    if(globalStore.fieldInfo[filter.field].type === 'string') {
       addAutoComplete(filter.field);
     }
     
     if(filter.value.match(/\[.+? TO .+?\]/)) {
       var values = filter.value.split(/(\[| TO |\])/);
       
-      if(fieldInfo[filter.field].type === 'int') {
+      if(globalStore.fieldInfo[filter.field].type === 'int') {
         $("#slide").slider( "values", [values[2], values[4]] );
       }
       else {
@@ -1341,19 +1344,19 @@ function addFilterControls() {
         "Delete": function() {
           
           // grab groupID before deleting
-          var groupID = filters[id].logicGroup;
-          delete filters[id];
+          var groupID = globalStore.filters[id].logicGroup;
+          delete globalStore.filters[id];
           
           var gtmp = [];
           
           // remove it from logicGroups
-          for(var i=0; i<logicGroups[groupID].filters.length; i++) {
-            if(logicGroups[groupID].filters[i].id != id) {
-              gtmp.push(logicGroups[groupID].filters[i]);
+          for(var i=0; i<globalStore.logicGroups[groupID].filters.length; i++) {
+            if(globalStore.logicGroups[groupID].filters[i].id != id) {
+              gtmp.push(globalStore.logicGroups[groupID].filters[i]);
             }
           }
           
-          logicGroups[groupID].filters = gtmp;
+          globalStore.logicGroups[groupID].filters = gtmp;
           
           resetFilterInput();
           
@@ -1377,7 +1380,7 @@ function updateDownloadURL(event) {
   var fields = [];
   for(var i=0; i<globalStore.order.length; i++) {
     var field = globalStore.order[i];
-    if(!fieldInfo[field].hidden) { fields.push(field); }
+    if(!globalStore.fieldInfo[field].hidden) { fields.push(field); }
   }
   
   $('.download-' + type).attr('href', $('#url-value').prop("value") + '&wt=' + type + '&rows=999999999&fl=' + fields.toString());
@@ -1388,8 +1391,8 @@ function updateCookies() {
   var order = globalStore.order;
   var hidden = {};
   
-  for(var k in fieldInfo) {
-    if(fieldInfo[k].hidden) { hidden[k] = true; }
+  for(var k in globalStore.fieldInfo) {
+    if(globalStore.fieldInfo[k].hidden) { hidden[k] = true; }
   }
   
   eraseCookie('order');
