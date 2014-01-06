@@ -187,3 +187,6 @@ tr:nth-child(even) {background-color: #f0f0f0;}
 .small-button {
   font-size: 12px;
 }
+.highlight {
+  background: green;
+}
