@@ -194,6 +194,10 @@ tr:nth-child(even) {background-color: #f0f0f0;}
   display: inline-table;
   border-left: 1px dotted grey;
   padding: 10px;
+  height: 210px;
+/*  width: 200px;*/
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .nvd3.nv-noData {
   font-size: 12px;

@@ -29,7 +29,7 @@ $(document).ready(function() {
   getFields();
   
   // do an initial blank search
-  doSearch();
+  doSearch(false);
   
   // init buttons
   initButtons();
@@ -393,7 +393,7 @@ function addFilter(field, value) {
   resetFilterInput();
   
   if($('#auto_update').prop('checked')) {
-    doSearch();
+    doSearch(true);
   }
   else {
     highlightSearch();
@@ -410,7 +410,7 @@ function editFilter(id, field, value) {
   resetFilterInput();
   
   if($('#auto_update').prop('checked')) {
-    doSearch();
+    doSearch(true);
   }
   else {
     highlightSearch();
@@ -634,8 +634,7 @@ function initButtons() {
   $('.search-button').button({disabled: $('#auto_update').prop('checked')}).click(function(event) {
     event.preventDefault();
     
-    window.location.hash = createQueryString();
-    doSearch();
+    doSearch(true);
     
     $(this).removeClass('highlight');
   });
@@ -666,7 +665,7 @@ function initButtons() {
           globalStore.logicGroups = [];
           
           updateQueryString();
-          doSearch();
+          doSearch(true);
           $(this).dialog("close");
           
           $('.search-button').removeClass('highlight');
@@ -719,7 +718,9 @@ function highlightSearch() {
 
 // main search function
 // passes on to renderResults
-function doSearch() {
+function doSearch(updateURL) {
+  if(updateURL) window.location.hash = createQueryString();
+  
   $('.results').empty().append('<img src="img/ajax-loader.gif"/> Searching');
   
   var url = $('#url-value').prop('value');
@@ -844,7 +845,7 @@ function getQueryStringFromWindowHash() {
 function parseEditedQueryString(noRedraw) {
   
   // get new value, remove base URL bits
-  var newValue = $('#url-value').prop('value').replace(globalStore.baseURL, '').replace(/\/select(\?q\=)?/, '');
+  var newValue = $('#url-value').prop('value').replace(globalStore.baseURL, '').replace(/\/\_search(\?q\=)?/, '');
   
   // split on groups
   var groups = $.grep(newValue.split(/[()]/), function(a) { return a.length > 0; });
@@ -966,7 +967,7 @@ function renderResults(json) {
   $('.download').append(
     '<div style="clear:both">URL for this query: <input readonly="readonly" id="exturl" class="url-value" type="text" value="' +
     window.location.href.replace(/\#.*/g, '') + '#' +
-    $('#url-value')[0].value.replace(globalStore.baseURL, '').replace('/select', '').replace('?q=', '') + '"></div>'
+    $('#url-value')[0].value.replace(globalStore.baseURL, '').replace('/_search', '').replace('?q=', '') + '"></div>'
   );
   $('#exturl').click(function() { $(this).select(); });
   
@@ -994,7 +995,7 @@ function renderResults(json) {
 }
 
 function renderSummary(aggs) {
-  $('.summary').append('<div id="chart_switcher" class="piechart" style="background: lightgrey"><b>Charts:</b><br/>');
+  $('.summary').append('<div id="chart_switcher" class="piechart" style="background: lightgrey">');
   
   for(i in globalStore.summaries) {
     var fieldInfo = globalStore.fieldInfo[i];
@@ -1009,17 +1010,32 @@ function renderSummary(aggs) {
     
     var data = [];
     var colours = [];
+    var labels = [];
+    var withData = {};
     
     for(var j in aggs[i].buckets) {
+      var key   = aggs[i].buckets[j].key;
+      var count = aggs[i].buckets[j].doc_count;
+      
+      if(count > 0) withData.key = count;
+      
       data.push({
-        label: aggs[i].buckets[j].key,
-        value: aggs[i].buckets[j].doc_count 
+        label: key,
+        value: count 
       });
+      
+      if(count > 0) labels.push(key);
       
       if(
         fieldInfo.hasOwnProperty('colours') &&
-        fieldInfo.colours.hasOwnProperty(aggs[i].buckets[j].key)
-      ) colours.push(fieldInfo.colours[aggs[i].buckets[j].key]);
+        fieldInfo.colours.hasOwnProperty(key)
+      ) colours.push(fieldInfo.colours[key]);
+    }
+    
+    // for fields with forced ranges, we can still get buckets but no docs
+    if(withData.length > 1) {
+      hasData = false;
+      $('input[rel=' + i + ']').prop('checked', false);
     }
     
     var chart = nv.models.pieChart()
@@ -1027,6 +1043,7 @@ function renderSummary(aggs) {
       .x(function(d) { return d.label })
       .y(function(d) { return d.value })
       .showLabels(true)
+      .labelThreshold(0.1)
       .showLegend(false)
       .valueFormat(d3.format(',i'));
     
@@ -1045,13 +1062,13 @@ function renderSummary(aggs) {
       .datum(data)
       .transition().duration(350)
       .call(chart);
-      
-    var slices = d3.select("#chart_" + i + " svg").select('.nv-pie').selectAll('.nv-slice')[0];
-    var labels = d3.select("#chart_" + i + " svg").select('.nv-pieLabels').selectAll('text')[0];
     
-    for(var j in slices) {
-      var slice = slices[j];
-      $(slice).prop("label", labels[j].innerHTML);
+    // add filter when a slice is clicked  
+    var slices = d3.select("#chart_" + i + " svg").select('.nv-pie').selectAll('.nv-slice')[0];
+    
+    for(var s in slices) {
+      var slice = slices[s];
+      $(slice).prop("label", labels[s]);
       $(slice).prop("field", i);
       
       $(slice).click(function(e) {
@@ -1061,6 +1078,9 @@ function renderSummary(aggs) {
         }
         
         addFilter(this.field, label);
+        
+        // hide the tooltip
+        $('.nvtooltip').hide();
       });
     }
   }
@@ -1378,7 +1398,7 @@ function renderAllLogicGroups(noRedraw) {
       if(!noRedraw) 
         listItems = listItems + '<li id="draggable-' + filter.id + '" title="' + globalStore.fieldInfo[filter.field].label + '"> ' +
           '<div><img src="img/move_icon.jpg" style="height:12px;" /> ' +
-          '<b>' + filter.field + '</b>:' + filter.value + '</div>' +
+          '<b>' + filter.field + '</b>: ' + filter.value + '</div>' +
           '<div style="clear:both;">&nbsp;<div style="float:right;">' +
             '<a href="javascript:" id="edit-filter-' + filter.id + '" title="Edit this filter">Edit</a>' +
             '<a style="display: none" href="javascript:" id="cancel-filter-' + filter.id + '" title="Cancel editing of this filter">Cancel edit</a> | ' +
@@ -1440,13 +1460,13 @@ function renderLogicGroup(group) {
       updateQueryString(true);
   
       if($('#auto_update').prop('checked')) {
-        doSearch();
+        doSearch(true);
       }
       else {
         highlightSearch();
       }
       
-      //doSearch();
+      //doSearch(true);
     })
   }
   
@@ -1475,13 +1495,13 @@ function renderLogicGroup(group) {
     updateQueryString(true);
   
     if($('#auto_update').prop('checked')) {
-      doSearch();
+      doSearch(true);
     }
     else {
       highlightSearch();
     }
     
-    //doSearch();
+    //doSearch(true);
   })
   
   // make sortable list
@@ -1513,7 +1533,7 @@ function renderLogicGroup(group) {
       updateQueryString();
       
       if($('#auto_update').prop('checked')) {
-        doSearch();
+        doSearch(true);
       }
       else {
         highlightSearch();
@@ -1612,7 +1632,7 @@ function addFilterControls() {
           $(this).dialog("close");
           
           if($('#auto_update').prop('checked')) {
-            doSearch();
+            doSearch(true);
           }
           else {
             highlightSearch();
