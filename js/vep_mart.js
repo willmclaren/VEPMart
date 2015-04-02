@@ -1017,7 +1017,7 @@ function renderSummary(aggs) {
       var key   = aggs[i].buckets[j].key;
       var count = aggs[i].buckets[j].doc_count;
       
-      if(count > 0) withData.key = count;
+      if(count > 0) withData[key] = count;
       
       data.push({
         label: key,
@@ -1033,7 +1033,7 @@ function renderSummary(aggs) {
     }
     
     // for fields with forced ranges, we can still get buckets but no docs
-    if(withData.length > 1) {
+    if(Object.keys(withData).length <= 1) {
       hasData = false;
       $('input[rel=' + i + ']').prop('checked', false);
     }
