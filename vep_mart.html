@@ -7,8 +7,11 @@
 <script type="text/javascript" src="js/jquery.dataTables.min.js"></script>
 <script type="text/javascript" src="js/vep_mart.js"></script>
 <script type="text/javascript" src="js/ColReorder.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/nvd3/1.7.1/nv.d3.min.js"></script>
 <link rel="stylesheet" href="css/jquery-ui-1.10.3.custom.min.css"/>
 <link rel="stylesheet" href="css/ColReorder.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nvd3/1.7.1/nv.d3.min.css"/>
 <link rel="stylesheet" href="css/style.css"/>
 </head>
 
@@ -27,9 +30,10 @@
     <div class="controls">
       <a href="javascript:" class="button search-button">Search</a>
       <a href="javascript:" class="button reset-button">Reset</a>
+      <br/><label style="font-size:small"><input type="checkbox" id="auto_update" checked="true">Auto-update</label>
     </div>
     <div class="search">
-      <img src="ajax-loader.gif"/>
+      <img src="img/ajax-loader.gif"/>
       Loading fields
     </div>
   </div>

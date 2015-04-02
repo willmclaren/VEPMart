@@ -2,15 +2,19 @@
 var globalStore = {
   
   // configure me!
-  baseURL: '/solr/vep',
-  configURL: 'config.xml',
+  baseURL: 'http://bc-29-3-07.internal.sanger.ac.uk:9200/variation/vep',
+	index: 'variation',
+	type: 'vep',
+  configURL: 'https://dl.dropboxusercontent.com/u/12936195/config.xml',
   
   // leave these
   filters: {},
   logicGroups: [],
   fieldInfo: {},
   groups: [],
-  lastFieldID: 0
+  lastFieldID: 0,
+  order: [],
+  summaries: {}
 };
 
 $(document).ready(function() {
@@ -86,6 +90,55 @@ function parseConfig(url) {
         globalStore.groups.push(group);
       });
       
+      // get colours
+      xml.find('colours').find('field').each(function() {
+        var field = $(this).attr('name');
+        globalStore.fieldInfo[field].colours = {};
+        
+        $(this).find('colour').each(function() {
+          
+          var value = $(this).attr('value');
+          var hex   = $(this).attr('hex');
+          
+          globalStore.fieldInfo[field].colours[value] = hex;
+        });
+      });
+      
+      // get summaries
+      var summaryCookie = readCookie('summaries');
+      var summaryCookieData = {};
+      if(summaryCookie) summaryCookieData = $.parseJSON(summaryCookie);
+      
+      console.log(summaryCookieData);
+      
+      xml.find('summaries').find('field').each(function() {
+        var field = $(this).attr('name');
+        var def   = $(this).attr('default');
+        
+        globalStore.summaries[field] = {
+          default: def,
+        };
+        
+        $(this).find('range').each(function() {
+          if(!globalStore.summaries[field].hasOwnProperty('ranges')) {
+            globalStore.summaries[field].ranges = [];
+          }
+          
+          var from = $(this).attr('from');
+          var to   = $(this).attr('to');
+          
+          globalStore.summaries[field].ranges.push({ from: from, to: to});
+        });
+        
+        // copy in any missing data from cookie
+        if(summaryCookieData.hasOwnProperty(field)) {
+          for(i in summaryCookieData[field]) {
+            if(!globalStore.summaries[field].hasOwnProperty(i)) globalStore.summaries[field][i] = summaryCookieData[field][i];
+          }
+        }
+      });
+       
+      
       // get order from cookie
       var orderCookie = readCookie('order');
       var order = [];
@@ -150,7 +203,7 @@ function createFooter(json) {
 
 function getFields() {
   $.ajax({
-    url: globalStore.baseURL + '/admin/luke',
+    url: globalStore.baseURL + '/_mapping',
     type: 'GET',
     dataType: 'json',
     
@@ -160,29 +213,47 @@ function getFields() {
     
     success: function( json ) {
       
+			var parseProperties = function(obj) {
+				var props = [];
+								
+				for (var i in obj) {
+					if (!obj.hasOwnProperty(i)) continue;
+					
+					if(obj[i].hasOwnProperty('properties')) {
+						var subProps = parseProperties(obj[i].properties);
+						
+						for(var j=0; j<subProps.length; j++) {
+							props.push(subProps[j]);
+						}
+					}
+					if(obj[i].hasOwnProperty('type')) {
+						var type = obj[i].type;
+						props.push({ 'field': i, 'type': type, 'label': i, 'header': i});
+					}
+				}
+				
+				return props;
+			};
+			
       // add fields
-      var fields = [];
-      for(var k in json.fields) {
-        if(!globalStore.fieldInfo[k]) continue;
-        fields.push(k);
-      }
+      var fields = parseProperties(json[globalStore.index].mappings[globalStore.type].properties);
       
       // sort fields using order from config
-      fields = fields.sort(function(a,b) { return (globalStore.fieldInfo[a].order || 999) - (globalStore.fieldInfo[b].order || 999) });
+      // fields = fields.sort(function(a,b) { return (globalStore.fieldInfo[a].order || 999) - (globalStore.fieldInfo[b].order || 999) });
       
       for(var k=0; k<fields.length; k++) {
-        var key = fields[k];
-        var field = json.fields[key];
-        var type = field.type;
+        var field = fields[k];
         if(!globalStore.fieldInfo[key]) continue;
         
         // store type and whether it's a multi index
-        globalStore.fieldInfo[key].type = type;
-        globalStore.fieldInfo[key].multi = field.schema.match(/M/) ? true : false;
+        globalStore.fieldInfo[field.field] = field;
+				
+        globalStore.order.push(field.field);
+        // globalStore.fieldInfo[key].multi = field.schema.match(/M/) ? true : false;
       }
       
       // write footer
-      createFooter(json);
+      // createFooter(json);
       
       $('.search')
         .empty()
@@ -208,7 +279,7 @@ function getFields() {
       
       for(var i=0; i<order.length; i++) {
         var key = order[i];
-        var field = json.fields[key];
+        var field = globalStore.fieldInfo[key];
         $('#combobox').append('<option value="' + key + '">' + globalStore.fieldInfo[key].label + '</option>');
       }
       
@@ -234,7 +305,7 @@ function getFields() {
       
       // add logic editor
       $('.filters-container')
-        .prepend('<div class="logic-container"><div class="logic-groups-container"><span style="color: grey; margin-left: 1em;">No fields selected yet</span></div></div>');
+        .prepend('<div class="logic-container"><div class="logic-groups-container"><span style="color: grey; margin-left: 1em;">No filters added yet</span></div></div>');
      
       $('.logic-container').append('<div class="add-logic-group hidden"><a href="#" class="button add-logic-button small-button">Add group</a>');
       $('.add-logic-button').button().on('click', function(event) {
@@ -252,9 +323,9 @@ function getFields() {
       $('#combo-input').on( "autocompleteselect", function( event, ui ) {;
         var key = $('#combobox').prop('value');
         
-        if(key === undefined || !json.fields.hasOwnProperty(key)) return;
+        if(key === undefined || !globalStore.fieldInfo.hasOwnProperty(key)) return;
         
-        var field = json.fields[key];
+        var field = globalStore.fieldInfo[key];
         var type = field.type;
         
         var valueInput = $('#current-value');
@@ -267,7 +338,7 @@ function getFields() {
         createSlider(key);
         
         // autocomplete string fields
-        if(type === 'string') {
+        if(type === 'string' || type == undefined) {
           addAutoComplete(key);
         }
       });
@@ -296,7 +367,7 @@ function getFields() {
 
 function addFilter(field, value) {
   
-  var filterID = ++globalStore.lastFieldID;
+  var filterID = globalStore.lastFieldID++;
   
   var filter = {
     id: filterID,
@@ -321,7 +392,12 @@ function addFilter(field, value) {
   
   resetFilterInput();
   
-  highlightSearch();
+  if($('#auto_update').prop('checked')) {
+    doSearch();
+  }
+  else {
+    highlightSearch();
+  }
 }
 
 function editFilter(id, field, value) {
@@ -333,7 +409,12 @@ function editFilter(id, field, value) {
   
   resetFilterInput();
   
-  highlightSearch();
+  if($('#auto_update').prop('checked')) {
+    doSearch();
+  }
+  else {
+    highlightSearch();
+  }
 }
 
 function resetFilterInput() {
@@ -353,113 +434,83 @@ function addAutoComplete(fieldName) {
   var source = [];
   
   $.ajax({
-    url: globalStore.baseURL + '/admin/luke',
-    type: 'GET',
+    url: globalStore.baseURL + '/_search',
+    type: 'POST',
     dataType: 'json',
+    processData: false,
     
-    data: {
-      wt: 'json',
-      fl: fieldName,
-      numTerms: 100
-    },
+    data: JSON.stringify({
+      size: 0,
+      aggs: {
+        agg : {
+          terms: { field: fieldName }
+        }
+      }
+    }),
+    
     
     success: function( fl ) {
       var distinct;
       
-      for(var key in fl.fields) {
-        var field = fl.fields[key];
-        distinct = field.distinct;
+      for(var key in fl.aggregations.agg.buckets) {
+        var field = fl.aggregations.agg.buckets[key];
+        source.push(field.key);
+      }
+      
+      input.autocomplete({
+        source: source,
+        minLength: 0
+      });
+      
+      input.keyup(function() {
         
-        if(field.topTerms) {
-          for (var i=0; i<field.topTerms.length; i+=2) {
-            source.push(unescape(field.topTerms[i]));
-          }
-        }
-      }
-      
-      if(distinct > 100) {
-        input.keyup(function() {
+        if(this.value.length && this.value != this.rel) {
           
-          if(this.value.length && this.value != this.rel) {
-            
-            this.rel = this.value;
-            
-            // multi field, do normal search
-            if(globalStore.fieldInfo[fieldName].multi) {                
-              $.ajax({
-                url: globalStore.baseURL + '/select',
-                type: 'GET',
-                dataType: 'json',
-                
-                data: {
-                  wt: 'json',
-                  q: $('#combobox').val() + ":*" + this.value + "*",
-                  rows: 100
-                },
-                
-                success: function( res ) {
-                  source = [];
-                  
-                  for(var i=0; i<res.response.docs.length; i++) {
-                    source.push(unescape(res.response.docs[i][fieldName]));
-                  }
-                  
-                  input.autocomplete({
-                    source: source,
-                    minLength: 0
-                  });
-                },
-                
-                error: function( xhr, status ) {
-                  console.log("Error doing search for " + this.q);
-                }
-              });
+          this.rel = this.value;
+          var key = $('#combobox').val();
+          
+          var inData = {
+            size: 0,
+            query: {
+              match_phrase_prefix: {},
+            },
+            aggs: {
+              agg : {
+                terms: { field: key }
+              }
             }
+          };
+          
+          inData.query.match_phrase_prefix[key] = this.value;
+          
+          $.ajax({
+
+            url: globalStore.baseURL + '/_search',
+            type: 'POST',
+            dataType: 'json',
+            processData: false,
+
+            data: JSON.stringify(inData),
             
-            // non-multi field, do group search
-            else {
-              $.ajax({
-                url: globalStore.baseURL + '/select',
-                type: 'GET',
-                dataType: 'json',
-                
-                data: {
-                  wt: 'json',
-                  q: $('#combobox').val() + ":*" + this.value + "*",
-                  rows: 100,
-                  group: true,
-                  'group.field': $('#combobox').val()
-                },
-                
-                success: function( res ) {
-                  source = [];
-                  
-                  for(var key in res.grouped) {
-                    for(var i=0; i<res.grouped[key].groups.length; i++) {
-                      source.push(unescape(res.grouped[key].groups[i].groupValue));
-                    }
-                    input.autocomplete({
-                      source: source,
-                      minLength: 0
-                    });
-                  }
-                },
-                
-                error: function( xhr, status ) {
-                  console.log("Error doing group search for " + this.q);
-                }
+            success: function( res ) {
+              source = [];
+              
+              for(var i=0; i<res.aggregations.agg.buckets.length; i++) {
+                source.push(unescape(res.aggregations.agg.buckets[i].key));
+              }
+              
+              input.autocomplete({
+                source: source,
+                minLength: 0
               });
+            },
+            
+            error: function( xhr, status ) {
+              console.log("Error doing search for " + this.q);
             }
-          }
-        });
-      }
-      
-      //else {
-        input.autocomplete({
-          source: source,
-          minLength: 0
-        });
-      //}
+          });
+        }
+      });
     }
   });
 }
@@ -474,7 +525,7 @@ function createSlider(key) {
     $('#current-slider').empty().append('<div class="slider-container" id="slider-container">').show();
     $('#slider-container').empty().append('<div class="slider" id="slide">');
     
-    if(type === 'int') {
+    if(globalStore.fieldInfo[key].range[1] > 1) {
       $("#slide").slider({
         range: true,
         min: globalStore.fieldInfo[key].range[0],
@@ -497,42 +548,77 @@ function createSlider(key) {
   }
   
   // create slider for int types
-  else if(type === 'int') {
+  else if(type === 'double' || type === 'float' || type === 'int') {
     
     // loading placeholder
     $('#current-slider').empty().append('<div class="slider-container" id="slider-container"><div class="loading"><img src="img/ajax-loader.gif"/> Getting field statistics</div>').show();
     
     // request min/max from stats
     $.ajax({
-      url: globalStore.baseURL + '/select',
-      type: 'GET',
+      url: globalStore.baseURL + '/_search',
+      type: 'POST',
       dataType: 'json',
+      processData: false,
       
-      data: {
-        wt: 'json',
-        q: '*:*',
-        rows: 0,
-        stats: true,
-        "stats.field": key
-      },
+      data: JSON.stringify({
+        size: 0,
+        aggs: {
+          "min" : {
+            "min" : {
+              "field" : key
+            }
+          },
+          "max" : {
+            "max" : {
+              "field" : key
+            }
+          }
+        }
+      }),
       
       key: key,
       
       success: function( r ) {
+        var min = r.aggregations.min.value;
+        var max = r.aggregations.max.value
+        
         globalStore.fieldInfo[this.key].range = [
-          r.stats.stats_fields[this.key].min, 
-          r.stats.stats_fields[this.key].max
+          min, 
+          max
         ];
         
         $('#slider-container').empty().append('<div rel="' + type + '" class="slider" id="slide">');
-        $("#slide").slider({
-          range: true,
-          min: globalStore.fieldInfo[this.key].range[0],
-          max: globalStore.fieldInfo[this.key].range[1],
-          slide: function( event, ui ) {
-            $('#current-value').val("[" + ui.values[0] + " TO " + ui.values[1] + "]");
-          }
-        });
+        // $("#slide").slider({
+        //   range: true,
+        //   min: globalStore.fieldInfo[this.key].range[0],
+        //   max: globalStore.fieldInfo[this.key].range[1],
+        //   slide: function( event, ui ) {
+        //     $('#current-value').val("[" + ui.values[0] + " TO " + ui.values[1] + "]");
+        //   }
+        // });
+        
+        var type = globalStore.fieldInfo[key].type;
+        
+        if(max <= 1) {
+          $("#slide").slider({
+            range: true,
+            min: globalStore.fieldInfo[key].range[0] * 1000,
+            max: globalStore.fieldInfo[key].range[1] * 1000,
+            slide: function( event, ui ) {
+              $('#current-value').val("[" + (ui.values[0] / 1000) + " TO " + (ui.values[1] / 1000) + "]");
+            }
+          });
+        }
+        else {
+          $("#slide").slider({
+            range: true,
+            min: globalStore.fieldInfo[key].range[0],
+            max: globalStore.fieldInfo[key].range[1],
+            slide: function( event, ui ) {
+              $('#current-value').val("[" + ui.values[0] + " TO " + ui.values[1] + "]");
+            }
+          });
+        }
       },
       
       error: function( xhr, status ) {
@@ -545,13 +631,18 @@ function createSlider(key) {
 function initButtons() {
   
   // search button
-  $('.search-button').button().click(function(event) {
+  $('.search-button').button({disabled: $('#auto_update').prop('checked')}).click(function(event) {
     event.preventDefault();
     
     window.location.hash = createQueryString();
     doSearch();
     
     $(this).removeClass('highlight');
+  });
+  
+  // auto update
+  $('#auto_update').change(function() {
+    $('.search-button').button({disabled: $('#auto_update').prop('checked')});
   });
   
   // reset button
@@ -571,6 +662,7 @@ function initButtons() {
           setQueryURL('');
           resetFilterInput();
           globalStore.filters = {};
+          globalStore.logicGroups = [];
           globalStore.logicGroups = [];
           
           updateQueryString();
@@ -632,16 +724,38 @@ function doSearch() {
   
   var url = $('#url-value').prop('value');
   
-  $.ajax({
-    url: url,
-    type: 'GET',
-    dataType: 'text',
+  // add summaries
+  var inData = {
+    size: 0,
+    aggs: {}
+  };
+  for(s in globalStore.summaries) {
+    var sum = globalStore.summaries[s];
     
-    data: {
-      wt: 'json',
-      indent: true,
-      rows: 10
-    },
+    if(!(sum.default || sum.show)) continue;
+    
+    if(sum.hasOwnProperty('ranges')) {
+      inData.aggs[s] = {
+        range: {
+          field: s,
+          ranges: sum.ranges
+        }
+      }
+    }
+    else {
+      inData.aggs[s] = {
+        terms: { field: s }
+      };
+    }
+  }
+  
+  $.ajax({
+    url: url,//globalStore.baseURL + '/_search',
+    type: 'POST',
+    dataType: 'json',
+    processData: false,
+    
+    data: JSON.stringify(inData),
     
     success: function( text ) {
       renderResults(text);
@@ -693,10 +807,10 @@ function setQueryURL(qString) {
   var newValue;
   
   if(qString && qString.length) {
-    newValue = globalStore.baseURL + '/select?q=' + qString;
+    newValue = globalStore.baseURL + '/_search?q=' + qString;
   }
   else {
-    newValue = globalStore.baseURL + '/select';
+    newValue = globalStore.baseURL + '/_search';
   }
   
   $('#url-value')[0].value = newValue;
@@ -819,21 +933,23 @@ function parseEditedQueryString(noRedraw) {
 }
 
 // renders results panel
-function renderResults(text) {
+function renderResults(json) {
   $('.results').empty();
+  
+  var numFound = json.hits.total;
   
   // create tabs
   $('.results').append('<div id="results-accordion">');
-  
+
+  $('#results-accordion').append('<h3>Summary</h3><div class="summary" style="font-size:12px"><div style="margin-bottom: 10px"><b>Found ' + numberWithCommas(numFound) + ' results</b>');
   $('#results-accordion').append('<h3 id="formatted-label">Results preview</h3><div class="formatted" style="font-size:12px">');
   $('#results-accordion').append('<h3>Download</h3><div class="download">');
   
-  // parse JSON
-  var json = JSON.parse(text);
+  // summary section
+  renderSummary(json.aggregations);
  
   // download section
-  var numFound = json.response.numFound;
-  $('.download').append('Download ' + numFound + ' results as: ');
+  $('.download').append('Download ' + numberWithCommas(numFound) + ' results as: ');
   
   var types = ['XML', 'JSON', 'CSV'];
   for(var i=0; i<types.length; i++) {
@@ -859,7 +975,7 @@ function renderResults(text) {
     renderTable();
     
     // add query time
-    $('.formatted').append('<div style="font-size:small; color: grey; clear: both; padding-top:1em;">Query time: ' + (json.responseHeader.QTime / 1000) + 's');
+    $('.formatted').append('<div style="font-size:small; color: grey; clear: both; padding-top:1em;">Query time: ' + (json.took / 1000) + 's');
   }
   else {
     $('.formatted').append('Start searching to see results here!');
@@ -867,13 +983,102 @@ function renderResults(text) {
   
   $('#results-accordion').accordion({
     collapsible: true,
-    heightStyle: "content",
-    beforeActivate: function(event, ui) {
-      var table = $.fn.dataTable.fnTables();
-      if ( table.length > 0 ) {
-        $(table).dataTable().fnAdjustColumnSizing();
-      }
+    heightStyle: "content"//,
+    // beforeActivate: function(event, ui) {
+    //   var table = $.fn.dataTable.fnTables();
+    //   if ( table.length > 0 ) {
+    //     $(table).dataTable().fnAdjustColumnSizing();
+    //   }
+    // }
+  });
+}
+
+function renderSummary(aggs) {
+  $('.summary').append('<div id="chart_switcher" class="piechart" style="background: lightgrey"><b>Charts:</b><br/>');
+  
+  for(i in globalStore.summaries) {
+    var fieldInfo = globalStore.fieldInfo[i];
+    
+    var hasData = aggs.hasOwnProperty(i) && aggs[i].buckets.length > 1;
+    var show    = globalStore.summaries[i].hasOwnProperty('show') ? globalStore.summaries[i].show : globalStore.summaries[i].default;
+    if(!show) show = false;
+    
+    $('#chart_switcher').append('<div><label><input type="checkbox" class="chart_switcher" rel="' + i + '"' + (show && hasData ? ' checked' : '') + '>' + fieldInfo.header + '</label>');
+    
+    if(!aggs.hasOwnProperty(i)) continue;
+    
+    var data = [];
+    var colours = [];
+    
+    for(var j in aggs[i].buckets) {
+      data.push({
+        label: aggs[i].buckets[j].key,
+        value: aggs[i].buckets[j].doc_count 
+      });
+      
+      if(
+        fieldInfo.hasOwnProperty('colours') &&
+        fieldInfo.colours.hasOwnProperty(aggs[i].buckets[j].key)
+      ) colours.push(fieldInfo.colours[aggs[i].buckets[j].key]);
     }
+    
+    var chart = nv.models.pieChart()
+      .donut(true)
+      .x(function(d) { return d.label })
+      .y(function(d) { return d.value })
+      .showLabels(true)
+      .showLegend(false)
+      .valueFormat(d3.format(',i'));
+    
+    if(colours.length) chart.color(colours);
+        
+    $('.summary').append(
+      '<div id="chart_' + i + '" class="piechart">' +
+      '<b>' + fieldInfo.label + '</b>' +
+      '<svg style="height:180px;width:180px">' +
+      (aggs[i].sum_other_doc_count ? '<div>Not shown: ' + aggs[i].sum_other_doc_count : '')
+    );
+    
+    if(!(show && hasData)) $('#chart_' + i).hide();
+    
+    d3.select("#chart_" + i + " svg")
+      .datum(data)
+      .transition().duration(350)
+      .call(chart);
+      
+    var slices = d3.select("#chart_" + i + " svg").select('.nv-pie').selectAll('.nv-slice')[0];
+    var labels = d3.select("#chart_" + i + " svg").select('.nv-pieLabels').selectAll('text')[0];
+    
+    for(var j in slices) {
+      var slice = slices[j];
+      $(slice).prop("label", labels[j].innerHTML);
+      $(slice).prop("field", i);
+      
+      $(slice).click(function(e) {
+        var label = this.label;
+        if(label.match(/[\d\.]+\-[\d\.]+/)) {
+          label = '[' + label.replace('-', ' TO ') + ']';
+        }
+        
+        addFilter(this.field, label);
+      });
+    }
+  }
+  
+  $('.chart_switcher').change(function(e) {
+    var chartID = $(this).attr("rel");
+        
+    if(this.checked) {
+      $('#chart_' + chartID).show();
+      globalStore.summaries[chartID].show = true;
+      if(!globalStore.summaries[chartID].default) doSearch();
+    }
+    else {
+      $('#chart_' + chartID).hide();
+      globalStore.summaries[chartID].show = false;
+    }
+    
+    updateCookies();
   });
 }
 
@@ -944,8 +1149,8 @@ function renderTable() {
       // create object to pass to $.getJSON
       var newaoData = ({
         wt: 'json',
-        rows: length,
-        start: start
+        length: length,
+        from: start
       });
       
       $.getJSON( sSource, newaoData, function (json) {
@@ -957,20 +1162,40 @@ function renderTable() {
         getColumnOrder();
         var order = globalStore.order;
         
-        for(var i=0; i<json.response.docs.length; i++) {
+        var parseResult = function(obj, prefix) {
+          var res = {};
+          
+          for(var k in obj) {
+            if(typeof obj[k] == 'object') {
+              var subRes = parseResult(obj[k], (prefix.length ? prefix + '.' : '') + k + '.');
+              
+              for(var l in subRes) {
+                res[l] = subRes[l];
+              }
+            }
+            else {
+              res[prefix + k] = obj[k];
+            }
+          }
+          
+          return res;
+        };
+        
+        for(var i=0; i<json.hits.hits.length; i++) {
+          var res = parseResult(json.hits.hits[i]._source, '');
           
           // reset row string
           var row = [];
           
           for(var j=0; j<order.length; j++) {
             var field = order[j];
-            row.push(json.response.docs[i][field] ? unescape(json.response.docs[i][field]) : '-');
+            row.push(res[field] ? unescape(res[field]) : '-');
           }
           
           rows.push(row);
         }
         
-        var numFound = json.response.numFound;
+        var numFound = json.hits.total;
         
         var output = {
           "iTotalDisplayRecords": numFound,
@@ -1183,9 +1408,10 @@ function renderAllLogicGroups(noRedraw) {
     $('.add-logic-group').removeClass('hidden');
   }
   
-  //else if(totalFiltersAdded == 0) {
-  //  $('.logic-groups-container').append('<span style="color: grey; margin-left: 1em;">No fields selected yet</span>');
-  //}
+  else if(totalFiltersAdded == 0) {
+   $('.logic-groups-container').append('<span style="color: grey; margin-left: 1em;">No filters added yet</span>');
+   $('.add-logic-group').addClass('hidden');
+  }
   
   addFilterControls();
   
@@ -1212,6 +1438,13 @@ function renderLogicGroup(group) {
       var id = this.name.replace('outer_', '');
       globalStore.logicGroups[id].outerLogic = this.value;
       updateQueryString(true);
+  
+      if($('#auto_update').prop('checked')) {
+        doSearch();
+      }
+      else {
+        highlightSearch();
+      }
       
       //doSearch();
     })
@@ -1240,6 +1473,13 @@ function renderLogicGroup(group) {
     $('#logic-group' + id).addClass(this.value);
     
     updateQueryString(true);
+  
+    if($('#auto_update').prop('checked')) {
+      doSearch();
+    }
+    else {
+      highlightSearch();
+    }
     
     //doSearch();
   })
@@ -1271,6 +1511,13 @@ function renderLogicGroup(group) {
       });
       
       updateQueryString();
+      
+      if($('#auto_update').prop('checked')) {
+        doSearch();
+      }
+      else {
+        highlightSearch();
+      }
     }
   }).disableSelection();
   
@@ -1364,7 +1611,12 @@ function addFilterControls() {
           updateQueryString();
           $(this).dialog("close");
           
-          highlightSearch();
+          if($('#auto_update').prop('checked')) {
+            doSearch();
+          }
+          else {
+            highlightSearch();
+          }
         },
         "Cancel": function() {
           $(this).dialog("close");
@@ -1377,19 +1629,20 @@ function addFilterControls() {
 function updateDownloadURL(event) {
   var type = event.data.type;
   
-  var fields = [];
-  for(var i=0; i<globalStore.order.length; i++) {
-    var field = globalStore.order[i];
-    if(!globalStore.fieldInfo[field].hidden) { fields.push(field); }
-  }
+  // var fields = [];
+  // for(var i=0; i<globalStore.order.length; i++) {
+  //   var field = globalStore.order[i];
+  //   if(!globalStore.fieldInfo[field].hidden) { fields.push(field); }
+  // }
   
-  $('.download-' + type).attr('href', $('#url-value').prop("value") + '&wt=' + type + '&rows=999999999&fl=' + fields.toString());
+  $('.download-' + type).attr('href', $('#url-value').prop("value"));// + '&wt=' + type + '&rows=999999999&fl=' + fields.toString());
 }
 
 // this function updates cookies that store field order and hidden state
 function updateCookies() {
   var order = globalStore.order;
   var hidden = {};
+  var summaries = globalStore.summaries;
   
   for(var k in globalStore.fieldInfo) {
     if(globalStore.fieldInfo[k].hidden) { hidden[k] = true; }
@@ -1397,9 +1650,11 @@ function updateCookies() {
   
   eraseCookie('order');
   eraseCookie('hidden');
+  eraseCookie('summaries');
   
   createCookie('order', JSON.stringify(order), (10 * 365));
   createCookie('hidden', JSON.stringify(hidden), (10 * 365));
+  createCookie('summaries', JSON.stringify(summaries), (10 * 365));
 }
 
 function createCookie(name, value, days) {
@@ -1428,6 +1683,10 @@ function readCookie(name) {
 
 function eraseCookie(name) {
   createCookie(name, "", -1);
+}
+
+function numberWithCommas(x) {
+  return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 // combobox code

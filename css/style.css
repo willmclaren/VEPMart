@@ -190,3 +190,11 @@ tr:nth-child(even) {background-color: #f0f0f0;}
 .highlight {
   background: green;
 }
+.piechart {
+  display: inline-table;
+  border-left: 1px dotted grey;
+  padding: 10px;
+}
+.nvd3.nv-noData {
+  font-size: 12px;
+}
