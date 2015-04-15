@@ -190,6 +190,13 @@ tr:nth-child(even) {background-color: #f0f0f0;}
 .highlight {
   background: green;
 }
+.preview .summary {
+  font-size: 12px;
+}
+.chart-holder {
+  display: inline-table;
+  overflow-x: scroll;
+}
 .piechart {
   display: inline-table;
   border-left: 1px dotted grey;
@@ -198,6 +205,10 @@ tr:nth-child(even) {background-color: #f0f0f0;}
 /*  width: 200px;*/
   overflow-x: hidden;
   overflow-y: auto;
+}
+.summary-spinner {
+  display: inline-table;
+  padding-left: 10px;
 }
 .nvd3.nv-noData {
   font-size: 12px;

@@ -20,6 +20,7 @@
     <div class="url-container">
       <label class="url-label">Current query string:</label>
       <input type="text" class="url-value" id="url-value"/>
+      <span class="search-spinner"><img src="img/ajax-loader.gif"/></span>
     </div>
     <div class="title">
       <nobr><h1><img src="img/vep_logo_sm.png" style="vertical-align: middle"> MART</h1></nobr>
@@ -46,7 +47,13 @@
     </div>
     
     <div class="results-container">
-      <div class="results"></div>
+      <div class="results">
+        <div id="results-accordion" class="accordion">
+          <h3>Summary</h3><div class="summary update-on-search" style="font-size:12px"></div>
+          <h3>Results preview</h3><div class="preview update-on-search" style="font-size:12px"></div>
+          <h3>Download</h3><div class="download update-on-search"></div>
+        </div>
+      </div>
     </div>
   </div>
   
