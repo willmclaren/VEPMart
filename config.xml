@@ -6,70 +6,75 @@
     <fields>
         <group name="Variation">
             <sub name="Other">
-                <field name="Uploaded_variation" label="Variation name (e.g. rs123)" header="ID"/>
-                <field name="Allele" label="Alternate allele" header="Allele"/>
-                <field name="CLIN_SIG" label="Clinical significance" header="Clinical"/>
+                <field name="id" label="Variation name (e.g. rs123)" header="ID"/>
+                <field name="allele_string" label="Allele string" header="Allele string"/>
+                <field name="clinical_significance" label="Clinical significance" header="Clinical"/>
+                <field name="variant_class" label="Variant class" header="Class"/>
             </sub>
             <sub name="Frequency">
-                <field name="GMAF" label="Global minor allele frequency" header="GMAF" range="0,0.5"/>
-                <field name="AFR_MAF" label="1000 genomes African MAF" header="AFR" range="0,0.5"/>
-                <field name="AMR_MAF" label="1000 genomes American MAF" header="AMR" range="0,0.5"/>
-                <field name="ASN_MAF" label="1000 genomes Asian MAF" header="ASN" range="0,0.5"/>
-                <field name="EUR_MAF" label="1000 genomes European MAF" header="EUR" range="0,0.5"/>
-                <field name="AA_MAF" label="NHLBI-ESP African American MAF" header="AA" range="0,0.5"/>
-                <field name="EA_MAF" label="NHLBI-ESP European American MAF" header="EA" range="0,0.5"/>
+                <field name="minor_allele_freq" label="Global minor allele frequency" header="GMAF" range="0,0.5"/>
+                <field name="afr_af" label="1000 genomes African MAF" header="AFR" range="0,0.5"/>
+                <field name="amr_af" label="1000 genomes American MAF" header="AMR" range="0,0.5"/>
+                <field name="asn_af" label="1000 genomes Asian MAF" header="ASN" range="0,0.5"/>
+                <field name="eur_af" label="1000 genomes European MAF" header="EUR" range="0,0.5"/>
+                <field name="aa_af" label="NHLBI-ESP African American MAF" header="AA" range="0,0.5"/>
+                <field name="ea_af" label="NHLBI-ESP European American MAF" header="EA" range="0,0.5"/>
             </sub>
         </group>
         
         <group name="Location">
             <sub name="Genomic">
-                <field name="chr" label="Chromosome" header="Chr"/>
+                <field name="seq_region_name" label="Chromosome" header="Chr"/>
                 <field name="start" label="Start position (bp)" header="Start"/>
                 <field name="end" label="End position (bp)" header="End"/>
             </sub>
             <sub name="Transcript">
-                <field name="cDNA_postion" label="cDNA position" header="cDNA"/>
-                <field name="CDS_position" label="Coding sequence position" header="CDS"/>
-                <field name="Protein_position" label="Protein position" header="AA"/>
-                <field name="DISTANCE" label="Distance to transcript start site" header="TSS"/>
-                <field name="EXON" label="Exon number" header="Exon"/>
-                <field name="INTRON" label="Intron number" header="Intron"/>
+                <field name="cdna_start" label="cDNA start position" header="cDNA start"/>
+                <field name="cdna_end" label="cDNA end position" header="cDNA end"/>
+                <field name="cds_start" label="Coding sequence start position" header="CDS start"/>
+                <field name="cds_end" label="Coding sequence end position" header="CDS end"/>
+                <field name="protein_start" label="Protein start position" header="Protein start"/>
+                <field name="protein_end" label="Protein end position" header="Protein end"/>
+                <field name="distance" label="Distance to transcript start site" header="TSS"/>
+                <field name="exon" label="Exon number" header="Exon"/>
+                <field name="intron" label="Intron number" header="Intron"/>
             </sub>
         </group>
         
         <group name="Gene">
             <sub name="Other">
-                <field name="Gene" label="Ensembl gene ID" header="Gene"/>
-                <field name="SYMBOL" label="Gene symbol (e.g. HGNC)" header="Symbol"/>
-                <field name="Feature" label="Transcript or RegulatoryFeature ID" header="Feature"/>
-                <field name="BIOTYPE" label="Transcript biotype" header="Biotype"/>
-                <field name="CANONICAL" label="Canonical transcript?" header="Canonical"/>
-                <field name="ENSP" label="Ensembl protein ID" header="Protein"/>
-                <field name="DOMAINS" label="Overlapping protein domains" header="Domains"/>
-                <field name="CCDS" label="Consensus CDS ID" header="CCDS"/>
+                <field name="gene_id" label="Ensembl gene ID" header="Gene"/>
+                <field name="gene_symbol" label="Gene symbol (e.g. HGNC)" header="Symbol"/>
+                <field name="transcript_id" label="Transcript ID" header="Transcript"/>
+                <field name="regulatory_feature_id" label="Regulatory Feature ID" header="RegFeat"/>
+                <field name="biotype" label="Biotype" header="Biotype"/>
+                <field name="canonical" label="Canonical transcript?" header="Canonical"/>
+                <field name="protein_id" label="Ensembl protein ID" header="Protein"/>
+                <field name="domains" label="Overlapping protein domains" header="Domains"/>
+                <field name="ccds" label="Consensus CDS ID" header="CCDS"/>
             </sub>
         </group>
         
         <group name="Consequence">
             <sub name="Other">
-                <field name="Consequence" label="Consequence type" header="Consequence"/>
-                <field name="SIFT_pred" label="SIFT prediction" header="SIFT"/>
-                <field name="SIFT_score" label="SIFT score" header="SIFT score" range="0,1"/>
-                <field name="PolyPhen_pred" label="PolyPhen prediction" header="PolyPhen"/>
-                <field name="PolyPhen_score" label="PolyPhen score" header="PolyPhen score" range="0,1"/>
-                <field name="HGVSc" label="HGVS coding notation" header="HGVSc"/>
-                <field name="HGVSp" label="HGVS protein notation" header="HGVSp"/>
-                <field name="Amino_acids" label="Amino acids" header="AAs"/>
-                <field name="Codons" label="Codons" header="Codons"/>
+                <field name="most_severe_consequence" label="Most severe consequence" header="Consequence"/>
+                <field name="sift_prediction" label="SIFT prediction" header="SIFT"/>
+                <field name="sift_score" label="SIFT score" header="SIFT score" range="0,1"/>
+                <field name="polyphen_prediction" label="PolyPhen prediction" header="PolyPhen"/>
+                <field name="polyphen_score" label="PolyPhen score" header="PolyPhen score" range="0,1"/>
+                <field name="hgvs_coding" label="HGVS coding notation" header="HGVSc"/>
+                <field name="hgvs_protein" label="HGVS protein notation" header="HGVSp"/>
+                <field name="amino_acids" label="Amino acids" header="AAs"/>
+                <field name="codons" label="Codons" header="Codons"/>
             </sub>
         </group>
         
         <group name="Regulatory">
             <sub name="Other">
-                <field name="MOTIF_NAME" label="Transcription factor binding motif ID" header="Motif"/>
-                <field name="MOTIF_POS" label="Motif position" header="MPos"/>
-                <field name="MOTIF_SCORE_CHANGE" label="Motif binding score change" header="MChange" range="-1,1"/>
-                <field name="HIGH_INF_POS" label="High information position?" header="MInfo"/>
+                <field name="motif_name" label="Transcription factor binding motif ID" header="Motif"/>
+                <field name="motif_pos" label="Motif position" header="MPos"/>
+                <field name="motif_score_change" label="Motif binding score change" header="MChange" range="-1,1"/>
+                <field name="high_inf_pos" label="High information position?" header="MInfo"/>
             </sub>
         </group>
         
@@ -80,4 +85,80 @@
         </group>-->
         
     </fields>
+    
+    <colours>
+      <field name="most_severe_consequence">
+        <colour value="intergenic_variant" hex="gray"/>
+        <colour value="intron_variant" hex="#02599c"/>
+        <colour value="upstream_gene_variant" hex="#a2b5cd"/>
+        <colour value="downstream_gene_variant" hex="#a2b5cd"/>
+        <colour value="5_prime_utr_variant" hex="#7ac5cd"/>
+        <colour value="3_prime_utr_variant" hex="#7ac5cd"/>
+        <colour value="splice_region_variant" hex="#ff7f50"/>
+        <colour value="splice_donor_variant" hex="#ff7f50"/>
+        <colour value="splice_acceptor_variant" hex="#ff7f50"/>
+        <colour value="frameshift_variant" hex="#ff69b4"/>
+        <colour value="transcript_ablation" hex="#ff0000"/>
+        <colour value="transcript_amplification" hex="#ff69b4"/>
+        <colour value="inframe_insertion" hex="#ff69b4"/>
+        <colour value="inframe_deletion" hex="#ff69b4"/>
+        <colour value="synonymous_variant" hex="#76ee00"/>
+        <colour value="stop_retained_variant" hex="#76ee00"/>
+        <colour value="missense_variant" hex="#ffd700"/>
+        <colour value="initiator_codon_variant" hex="#ffd700"/>
+        <colour value="stop_gained" hex="#ff0000"/>
+        <colour value="stop_lost" hex="#ff0000"/>
+        <colour value="mature_mirna_variant" hex="#458b00"/>
+        <colour value="non_coding_transcript_exon_variant" hex="#32cd32"/>
+        <colour value="non_coding_transcript_variant" hex="#32cd32"/>
+        <colour value="incomplete_terminal_codon_variant" hex="#ff00ff"/>
+        <colour value="nmd_transcript_variant" hex="#ff4500"/>
+        <colour value="coding_sequence_variant" hex="#458b00"/>
+        <colour value="tfbs_ablation" hex="brown"/>
+        <colour value="tfbs_amplification" hex="brown"/>
+        <colour value="tf_binding_site_variant" hex="brown"/>
+        <colour value="regulatory_region_variant" hex="brown"/>
+        <colour value="regulatory_region_ablation" hex="brown"/>
+        <colour value="regulatory_region_amplification" hex="brown"/>
+      </field>
+
+      <field name="polyphen_prediction">
+        <colour value="probably_damaging" hex="red"/>
+        <colour value="possibly_damaging" hex="#1f77b4"/>
+        <colour value="benign" hex="green"/>
+        <colour value="unknown" hex="grey"/>
+      </field>
+
+      <field name="sift_prediction">
+        <colour value="deleterious" hex="red"/>
+        <colour value="tolerated" hex="green"/>
+        <colour value="deleterious_low_confidence" hex="pink"/>
+        <colour value="tolerated_low_confidence" hex="lightgreen"/>
+      </field>
+    </colours>
+    
+    <summaries>
+      <field name="variant_class" default="true"/>
+      <field name="most_severe_consequence" default="true"/>
+      <field name="minor_allele_freq" type="range" default="true">
+        <range from="0" to="0.001"/>
+        <range from="0.001" to="0.01"/>
+        <range from="0.01" to="0.05"/>
+        <range from="0.05" to="0.1"/>
+        <range from="0.1" to="0.5"/>
+      </field>
+      <field name="clinical_significance"/>
+      <field name="sift_prediction"/>
+      <field name="polyphen_prediction"/>
+      <field name="biotype"/>
+      <field name="exon"/>
+      <field name="intron"/>
+      <field name="high_inf_pos"/>
+    </summaries>
+    
+    <examples>
+      <example label="Variants in BRCA2" queryString="(gene_symbol:brca2)"/>
+      <example label="Common variants scored deleterious by SIFT" queryString="(sift_prediction:deleterious AND minor_allele_freq:[0.01 TO 0.5])"/>
+      <example label="Deletions in chr6:34,000,000-35,000,000" queryString="(variant_class:deletion AND seq_region_name:6 AND start:[34000000 TO 35000000])"/>
+    </examples>
 </config>
