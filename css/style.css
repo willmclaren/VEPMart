@@ -1,7 +1,7 @@
 body {
   font-family: sans-serif;
-  padding-left: 1em;
-  padding-right: 1em;
+/*  padding-left: 1em;*/
+/*  padding-right: 1em;*/
 }
 tr:nth-child(even) {background-color: #f0f0f0;}
 
@@ -24,6 +24,19 @@ tr:nth-child(even) {background-color: #f0f0f0;}
   font-size: 18px;
   font-weight: bold;
 }
+.examples-container {
+  background-color: lightgrey;
+  border-radius: 4px;
+  padding: 1em;
+  margin-top: 2em;
+  font-size: small;
+}
+ul.examples {
+  margin-top: 0.5em;
+  margin-bottom: 0;
+  margin-left: 1em;
+  padding: 0;
+}
 .field-value {
   padding-left: 1em;
   padding-right: 1em;
@@ -32,6 +45,7 @@ tr:nth-child(even) {background-color: #f0f0f0;}
 .filters-container {
   float: left;
   width: 300px;
+  height: 100%;
 }
 .results-container {
   margin-left: 310px;
