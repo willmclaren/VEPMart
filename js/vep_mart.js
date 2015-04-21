@@ -6,17 +6,6 @@ var mart = {
   configURL: 'https://dl.dropboxusercontent.com/u/12936195/config.xml',
   summaryThreshold: 1000000,
   
-  examples: [
-    {
-      queryString: '(gene_symbol:brca2)',
-      label: 'BRCA2'
-    },
-    {
-      queryString: '(sift_prediction:deleterious AND minor_allele_freq:[0.01 TO 0.5])',
-      label: 'SIFT deleterious, common'
-    }
-  ],
-  
   // leave these
   filters: {},
   logicGroups: [],
@@ -38,10 +27,15 @@ var mart = {
     this.getFields();
   
     // do an initial blank search
-    // if(nullQuery) this.doSearch(false);
+    if(!window.location.hash.length) {
+      this.doSearch(false);
+    }
   
     // init buttons
     this.initButtons();
+    
+    // show examples
+    this.renderExamples();
     
     // create accordion
     $('.accordion').accordion({
@@ -133,8 +127,6 @@ var mart = {
         var summaryCookieData = {};
         if(summaryCookie) summaryCookieData = $.parseJSON(summaryCookie);
       
-        console.log(summaryCookieData);
-      
         xml.find('summaries').find('field').each(function() {
           var field = $(this).attr('name');
           var def   = $(this).attr('default');
@@ -160,6 +152,18 @@ var mart = {
               if(!mart.summaries[field].hasOwnProperty(i)) mart.summaries[field][i] = summaryCookieData[field][i];
             }
           }
+        });
+        
+        if(!mart.hasOwnProperty('examples')) mart.examples = [];
+        
+        xml.find('examples').find('example').each(function() {
+          var label = $(this).attr('label');
+          var queryString = $(this).attr('queryString');
+          
+          mart.examples.push({
+            label: label,
+            queryString: queryString
+          });
         });
        
       
@@ -1474,10 +1478,11 @@ var mart = {
   // examples  
   renderExamples: function () {
 
-    if(this.hasOwnProperty('examples')) {
+    if(this.hasOwnProperty('examples') && !$('ul.examples').length) {
       var baseURL = 'vep_mart.html#';
-      $('.logic-groups-container').append('<h3>Example queries</h3><div><ul class="examples">');
-    
+      
+      $('.filters-container').append('<div class="examples-container">Example queries:<ul class="examples">');
+      
       for(var e in this.examples) {
         var example = this.examples[e];
         $('.examples').append('<li><a href="javascript:" rel="' + example.queryString + '" class="example-link">' + example.label + '</a></li>');
@@ -1485,8 +1490,35 @@ var mart = {
       
       $('.example-link').on('click', function(event) {
         event.preventDefault();
-        window.location.hash = this.rel;
-        mart.getQueryStringFromWindowHash();
+        
+        var newHash = this.rel;
+        
+        if(window.location.hash.length) {
+          $('body').append('<div id="dialog-confirm" title="Replace current filters?"></div>');
+          $('#dialog-confirm').dialog({
+            resizable: false,
+            height: 140,
+            modal: true,
+            buttons: {
+              "Reset": function() {
+                event.preventDefault();
+                
+                window.location.hash = newHash;
+                mart.getQueryStringFromWindowHash();
+                
+                $(this).dialog("close");
+              },
+              "Cancel": function() {
+                $(this).dialog("close");
+              }
+            }
+          });
+        }
+        
+        else {
+          window.location.hash = this.rel;
+          mart.getQueryStringFromWindowHash();
+        }
       });
     }
   },
@@ -1546,8 +1578,6 @@ var mart = {
     else if(totalFiltersAdded == 0) {
      $('.logic-groups-container').append('<span style="color: grey; margin-left: 1em;">No filters added yet</span>');
      $('.add-logic-group').addClass('hidden');
-     
-     mart.renderExamples();
     }
   
     this.addFilterControls();
@@ -1647,13 +1677,13 @@ var mart = {
           mart.logicGroups[groupId].filters = tmp;
         });
       
-        updateQueryString();
+        mart.updateQueryString();
       
         if($('#auto_update').prop('checked')) {
-          doSearch(true);
+          mart.doSearch(true);
         }
         else {
-          highlightSearch();
+          mart.highlightSearch();
         }
       }
     }).disableSelection();
@@ -1690,9 +1720,9 @@ var mart = {
       $('#current-value').val(filter.value);
     
       mart.createSlider(filter.field);
-      if(mart.fieldInfo[filter.field].type === 'string') {
+      // if(mart.fieldInfo[filter.field].type === 'string') {
         mart.addAutoComplete(filter.field);
-      }
+      // }
     
       if(filter.value.match(/\[.+? TO .+?\]/)) {
         var values = filter.value.split(/(\[| TO |\])/);
